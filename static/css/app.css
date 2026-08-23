@@ -1,0 +1,124 @@
+/* Минимальный CSS: читаемость важнее красоты. */
+:root {
+  --border: #d8dbe0;
+  --muted: #6b7280;
+  --accent: #2b5fd9;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 15px/1.5 system-ui, "Segoe UI", Arial, sans-serif;
+  color: #16181d;
+  background: #f7f8fa;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar .brand { font-weight: 600; text-decoration: none; color: inherit; }
+.topbar nav { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+.topbar .who { color: var(--muted); }
+
+main { max-width: 62rem; margin: 0 auto; padding: 1.5rem; }
+
+h1 { font-size: 1.4rem; }
+
+a { color: var(--accent); }
+
+form.inline { display: inline; }
+
+.toolbar {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+}
+
+.form-narrow { max-width: 28rem; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+th, td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+th { background: #f0f2f5; font-size: 0.85rem; text-transform: uppercase; }
+td.actions { white-space: nowrap; }
+
+.badge {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  margin-right: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #eef2ff;
+  font-size: 0.85rem;
+}
+
+input[type="text"],
+input[type="search"],
+input[type="password"],
+input[type="email"] {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 100%;
+}
+
+.topbar input, .toolbar input { width: auto; }
+
+button, .button {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  font: inherit;
+}
+
+button:hover, .button:hover { background: #f0f2f5; }
+
+.messages { list-style: none; padding: 0; margin: 0 0 1rem; }
+
+.message {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  background: #fff;
+}
+
+.message.success { border-color: #22c55e; background: #f0fdf4; }
+.message.error { border-color: #ef4444; background: #fef2f2; }
+
+.errors { color: #b91c1c; margin: 0.25rem 0; padding-left: 1rem; }
+.hint, .helptext { color: var(--muted); font-size: 0.9rem; }
+.pagination { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; }
+ul#id_groups { list-style: none; padding-left: 0; }

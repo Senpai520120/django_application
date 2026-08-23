@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Аудит ролей — панель{% endblock %}
+
+{% block content %}
+  <h1>Аудит: изменения ролей</h1>
+
+  <table>
+    <thead>
+      <tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Роль</th><th>Кому</th></tr>
+    </thead>
+    <tbody>
+      {% for change in changes %}
+        <tr>
+          <td>{{ change.created_at|date:"d.m.Y H:i" }}</td>
+          <td>{{ change.actor.username|default:"система" }}</td>
+          <td>{{ change.get_action_display }}</td>
+          <td><span class="badge">{{ change.group_name }}</span></td>
+          <td>{{ change.target.username }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5"><em>Изменений пока не было.</em></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if is_paginated %}
+    <nav class="pagination">
+      {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">← Назад</a>{% endif %}
+      <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">Вперёд →</a>{% endif %}
+    </nav>
+  {% endif %}
+{% endblock %}

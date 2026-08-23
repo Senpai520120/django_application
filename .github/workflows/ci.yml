@@ -1,0 +1,209 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+# Новый пуш в ветку отменяет предыдущий незавершённый прогон.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint:
+    name: Линтеры
+    runs-on: ubuntu-latest
+    # SECRET_KEY нужен локальным хукам pre-commit: они зовут manage.py.
+    env:
+      SECRET_KEY: ci-secret-key-not-for-production
+      DEBUG: "False"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - run: pip install -r requirements-dev.txt
+
+      - name: ruff
+        run: ruff check --output-format=github .
+
+      - name: black
+        run: black --check --diff .
+
+      - name: pre-commit (те же хуки, что и локально)
+        uses: pre-commit/action@v3.0.1
+
+  django-checks:
+    name: Проверки Django
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-secret-key-not-for-production
+      DEBUG: "False"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: manage.py check
+        run: python manage.py check
+
+      - name: Забытые миграции
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Аудит прод-настроек (как за HTTPS)
+        env:
+          SESSION_COOKIE_SECURE: "True"
+          CSRF_COOKIE_SECURE: "True"
+          SECURE_SSL_REDIRECT: "True"
+          SECURE_HSTS_SECONDS: "31536000"
+          SECURE_HSTS_INCLUDE_SUBDOMAINS: "True"
+          SECURE_HSTS_PRELOAD: "True"
+        run: python manage.py check --deploy --fail-level WARNING
+
+  test:
+    name: Тесты (Python ${{ matrix.python-version }}, PostgreSQL)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: users_roles
+          POSTGRES_USER: users_roles
+          POSTGRES_PASSWORD: users_roles
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      SECRET_KEY: ci-secret-key-not-for-production
+      DEBUG: "False"
+      DATABASE_URL: postgres://users_roles:users_roles@localhost:5432/users_roles
+      STATICFILES_BACKEND: django.contrib.staticfiles.storage.StaticFilesStorage
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - run: pip install -r requirements-dev.txt
+
+      - name: Миграции на чистой БД
+        run: python manage.py migrate --noinput
+
+      - name: pytest + покрытие
+        run: pytest --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=90
+
+      - name: Сохранить отчёт о покрытии
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+          if-no-files-found: error
+
+  compose-smoke:
+    name: docker compose up + HTTP-проверка
+    runs-on: ubuntu-latest
+    needs: [lint, django-checks, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Подготовить .env
+        run: |
+          cp .env.example .env
+          KEY=$(python -c "import secrets; print(secrets.token_urlsafe(64))")
+          sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$KEY|" .env
+
+      - name: Поднять стек
+        run: docker compose up -d --build
+
+      - name: Дождаться приложения
+        run: |
+          for _ in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/login/ || true)
+            if [ "$code" = "200" ]; then echo "приложение отвечает"; exit 0; fi
+            sleep 2
+          done
+          echo "приложение не поднялось, последний код: $code"
+          exit 1
+
+      - name: Роли засеяны, доступ закрыт для анонима
+        run: |
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/manage/)" = "302"
+          docker compose exec -T web python manage.py shell -c "
+          names = sorted(Group.objects.values_list('name', flat=True))
+          assert names == ['admin', 'user'], names
+          print('роли в БД:', names)"
+
+      - name: Логи контейнеров
+        if: failure()
+        run: docker compose logs
+
+      - name: Погасить стек
+        if: always()
+        run: docker compose down -v
+
+  publish:
+    name: Публикация образа в GHCR
+    runs-on: ubuntu-latest
+    needs: [compose-smoke]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

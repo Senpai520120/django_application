@@ -20,8 +20,9 @@ Django-приложение: пользователи логинятся вст�
 | Аутентификация | `django.contrib.auth`, сессии, встроенные `LoginView` / `LogoutView` |
 | Роли | встроенные `auth.Group` |
 | Конфигурация | `django-environ`, всё из переменных окружения |
-| Тесты | pytest + pytest-django (36 тестов) |
-| Линт | ruff + black |
+| Тесты | pytest + pytest-django, 43 теста, покрытие 98% |
+| Линт | ruff + black, локально через pre-commit |
+| CI/CD | GitHub Actions: линтеры → проверки Django → тесты → smoke docker compose → публикация образа в GHCR |
 
 ## Быстрый старт
 
@@ -45,7 +46,13 @@ python manage.py migrate
 # 5. Свой аккаунт администратора
 python manage.py createsuperuser
 
-# 6. Поехали
+# 6. Тестовые пользователи: админ, обычный, деактивированный и ещё десяток
+python manage.py seed_demo_users
+
+# 7. Хуки перед коммитом (ruff, black, проверки Django)
+pre-commit install
+
+# 8. Поехали
 python manage.py runserver
 ```
 
@@ -61,6 +68,30 @@ python manage.py runserver
 ```bash
 python manage.py shell -c "from django.contrib.auth.models import Group, User; User.objects.get(username='ivan').groups.add(Group.objects.get(name='admin'))"
 ```
+
+## Тестовые пользователи
+
+```bash
+python manage.py seed_demo_users              # создать/обновить
+python manage.py seed_demo_users --extra 0    # без «массовки» для пагинации
+python manage.py seed_demo_users --password 'My-Pass-1' --extra 5
+python manage.py seed_demo_users --delete     # удалить всех demo_*
+```
+
+Команда идемпотентна: повторный запуск не плодит дубликаты, а возвращает
+аккаунты к описанному состоянию (пароль, роли, флаги). При `DEBUG=False` она
+отказывается работать без `--force` — чтобы аккаунты с общеизвестным паролем
+не уехали в прод.
+
+| Логин | Роль | Зачем нужен |
+| --- | --- | --- |
+| `demo_admin` | группа `admin` | админ обычным способом, видит `/manage/` |
+| `demo_staff` | `is_staff` | проверить второй путь в панель, без группы |
+| `demo_user` | группа `user` | обычный юзер, на `/manage/` получает 403 |
+| `demo_inactive` | группа `user` | деактивирован, войти не сможет |
+| `demo_user01…10` | группа `user` | массовка для поиска и пагинации |
+
+Пароль у всех — `demo-password-123` (меняется флагом `--password`).
 
 ## Маршруты
 
@@ -97,6 +128,8 @@ python manage.py shell -c "from django.contrib.auth.models import Group, User; U
 | `CSRF_COOKIE_SECURE` | `False` | включать только на HTTPS |
 | `SECURE_SSL_REDIRECT` | `False` | редирект на HTTPS |
 | `SECURE_HSTS_SECONDS` | `0` | HSTS |
+| `SECURE_HSTS_INCLUDE_SUBDOMAINS` | `False` | HSTS для поддоменов |
+| `SECURE_HSTS_PRELOAD` | `False` | HSTS preload |
 | `CSRF_TRUSTED_ORIGINS` | пусто | нужно за HTTPS-прокси |
 
 `*_SECURE`-флаги по умолчанию выключены намеренно: на локальном HTTP браузер
@@ -133,11 +166,14 @@ python manage.py shell -c "from django.contrib.auth.models import Group, User; U
 | `accounts/urls.py` | подключение встроенных `LoginView` / `LogoutView` |
 | `accounts/migrations/0001_seed_groups.py` | data-миграция: роли `admin` и `user` |
 | `accounts/management/commands/seed_groups.py` | идемпотентный сид ролей |
+| `accounts/management/commands/seed_demo_users.py` | тестовые пользователи для локальной проверки |
 | `panel/views.py` | вьюхи панели `/manage/` |
 | `panel/forms.py` | форма ролей и форма создания пользователя |
 | `panel/models.py` | `RoleChange` — аудит изменений ролей (бонус) |
 | `templates/` | все шаблоны, включая `registration/login.html`, 403/404/500 |
 | `config/settings.py` | настройки на `django-environ` |
+| `.pre-commit-config.yaml` | хуки линтеров перед коммитом |
+| `.github/workflows/ci.yml` | пайплайн CI/CD |
 
 ## Роли и контроль доступа
 
@@ -162,8 +198,9 @@ class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
 ## Тесты
 
 ```bash
-pytest            # 36 тестов
+pytest                                  # 43 теста
 pytest -v
+pytest --cov --cov-report=term-missing  # покрытие (сейчас 98%)
 ```
 
 Покрыто:
@@ -178,7 +215,10 @@ pytest -v
 * `tests/test_panel.py` — поиск, пагинация, активация/деактивация, создание
   пользователя, страница аудита;
 * `tests/test_seed_groups.py` — роли появляются после `migrate`, команда
-  `seed_groups` идемпотентна.
+  `seed_groups` идемпотентна;
+* `tests/test_seed_demo_users.py` — тестовые юзеры создаются с нужными ролями и
+  флагами, команда идемпотентна, `--delete` не трогает чужие аккаунты, при
+  `DEBUG=False` без `--force` команда отказывается работать.
 
 Тестовое окружение задаётся в корневом `conftest.py` (там же `SECRET_KEY` для CI),
 фикстуры пользователей — в `tests/conftest.py`.
@@ -186,12 +226,42 @@ pytest -v
 ## Линт и форматирование
 
 ```bash
-ruff check .
-black --check .    # black . чтобы отформатировать
+ruff check .            # проверить
+ruff check --fix .      # починить автоматом
+black .                 # отформатировать
+black --check .         # только проверить, как в CI
 ```
 
-Обе команды проходят без замечаний; они же гоняются в CI
-(`.github/workflows/ci.yml`, вторым job-ом — pytest на PostgreSQL).
+Локально всё это удобнее гонять через pre-commit — он же стоит хуком на коммит:
+
+```bash
+pre-commit install          # один раз после клонирования
+pre-commit run --all-files  # прогнать по всему репозиторию
+pre-commit autoupdate       # обновить версии хуков
+```
+
+Хуки: базовая гигиена файлов (конец строки, пробелы, крупные файлы, приватные
+ключи, валидность YAML/TOML), `ruff --fix`, `black`, плюс два локальных —
+`manage.py check` и `makemigrations --check` (ловит забытые миграции).
+Локальные хуки зовут `python` из PATH, поэтому коммитить нужно с активированным
+venv.
+
+## CI/CD
+
+`.github/workflows/ci.yml` — на каждый push в `main`, на каждый pull request и
+по кнопке (`workflow_dispatch`). Пять job-ов:
+
+| Job | Что делает |
+| --- | --- |
+| **Линтеры** | `ruff check`, `black --check`, полный прогон `pre-commit` |
+| **Проверки Django** | `manage.py check`, `makemigrations --check` (забытые миграции), `check --deploy --fail-level WARNING` с включёнными HTTPS-флагами |
+| **Тесты** | матрица Python 3.12 и 3.13, реальный PostgreSQL 16 в сервис-контейнере, `pytest --cov --cov-fail-under=90`, отчёт о покрытии в артефактах |
+| **docker compose up** | поднимает стек как в проде, ждёт ответа приложения, проверяет 302 для анонима на `/manage/` и что роли засеяны, гасит стек |
+| **Публикация в GHCR** | только для `main` и тегов `v*`: собирает образ и пушит в `ghcr.io/<owner>/<repo>` с тегами `latest`, `sha-…`, semver. Использует встроенный `GITHUB_TOKEN`, секреты настраивать не нужно |
+
+CD доведён до публикации образа: дальше на своём сервере достаточно
+`docker compose pull && docker compose up -d` с этим образом. Обновление
+зависимостей — `.github/dependabot.yml` (pip, GitHub Actions, Docker, раз в неделю).
 
 ## PostgreSQL вместо SQLite
 
@@ -263,5 +333,6 @@ tests/            pytest-django
   (описание роли понадобится — заведём `Role` с `OneToOne` на `Group`).
 
 Стандартный `/admin/` включён, но задача решена своей страницей `/manage/`.
-#   d j a n g o _ a p p l i c a t i o n  
+#   d j a n g o _ a p p l i c a t i o n 
+ 
  

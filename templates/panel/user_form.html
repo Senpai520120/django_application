@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Новый пользователь — панель{% endblock %}
+
+{% block content %}
+  <h1>Новый пользователь</h1>
+
+  <form method="post" class="card form-narrow">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Создать</button>
+    <a href="{% url 'panel:user_list' %}">Отмена</a>
+  </form>
+{% endblock %}

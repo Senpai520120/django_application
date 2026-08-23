@@ -1,0 +1,42 @@
+{% load static %}<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Users &amp; Roles{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="{% url 'home' %}">Users &amp; Roles</a>
+  <nav>
+    {% if user.is_authenticated %}
+      {% if is_panel_admin %}
+        <a href="{% url 'panel:user_list' %}">Пользователи</a>
+        <a href="{% url 'panel:role_list' %}">Роли</a>
+        <a href="{% url 'panel:audit_log' %}">Аудит</a>
+      {% endif %}
+      <span class="who">{{ user.username }}</span>
+      <form method="post" action="{% url 'logout' %}" class="inline">
+        {% csrf_token %}
+        <button type="submit">Выйти</button>
+      </form>
+    {% else %}
+      <a href="{% url 'login' %}">Войти</a>
+    {% endif %}
+  </nav>
+</header>
+
+<main>
+  {% if messages %}
+    <ul class="messages">
+      {% for message in messages %}
+        <li class="message {{ message.tags }}">{{ message }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

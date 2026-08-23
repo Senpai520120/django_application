@@ -1,0 +1,10 @@
+# В репозитории и рабочей копии — LF. Иначе Windows-CRLF ломает shell-скрипты
+# в Docker и спорит с хуком mixed-line-ending.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.sqlite3 binary
