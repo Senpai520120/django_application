@@ -17,15 +17,14 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.12"
+  # Длина >= 50 символов: иначе check --deploy ругается (security.W009).
+  SECRET_KEY: ci-secret-key-not-for-production-0123456789-abcdefghij
+  DEBUG: "False"
 
 jobs:
   lint:
     name: Линтеры
     runs-on: ubuntu-latest
-    # SECRET_KEY нужен локальным хукам pre-commit: они зовут manage.py.
-    env:
-      SECRET_KEY: ci-secret-key-not-for-production
-      DEBUG: "False"
     steps:
       - uses: actions/checkout@v4
 
@@ -48,9 +47,6 @@ jobs:
   django-checks:
     name: Проверки Django
     runs-on: ubuntu-latest
-    env:
-      SECRET_KEY: ci-secret-key-not-for-production
-      DEBUG: "False"
     steps:
       - uses: actions/checkout@v4
 
@@ -99,8 +95,6 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     env:
-      SECRET_KEY: ci-secret-key-not-for-production
-      DEBUG: "False"
       DATABASE_URL: postgres://users_roles:users_roles@localhost:5432/users_roles
       STATICFILES_BACKEND: django.contrib.staticfiles.storage.StaticFilesStorage
     steps:
