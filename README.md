@@ -167,6 +167,7 @@ python manage.py seed_demo_users --delete     # удалить всех demo_*
 | `accounts/migrations/0001_seed_groups.py` | data-миграция: роли `admin` и `user` |
 | `accounts/management/commands/seed_groups.py` | идемпотентный сид ролей |
 | `accounts/management/commands/seed_demo_users.py` | тестовые пользователи для локальной проверки |
+| `docker/entrypoint.sh` | стартовая последовательность контейнера |
 | `panel/views.py` | вьюхи панели `/manage/` |
 | `panel/forms.py` | форма ролей и форма создания пользователя |
 | `panel/models.py` | `RoleChange` — аудит изменений ролей (бонус) |
@@ -281,13 +282,39 @@ cp .env.example .env     # SECRET_KEY обязателен, остальное c
 docker compose up --build
 ```
 
-Поднимутся Postgres и приложение на http://127.0.0.1:8000/. Контейнер сам
-прогоняет `migrate`, `seed_groups` и `collectstatic`, статику раздаёт whitenoise,
-сервер — gunicorn. Суперпользователя создать так:
+Поднимутся Postgres и приложение на http://127.0.0.1:8000/. Всё, что нужно для
+старта, делает `docker/entrypoint.sh`:
+
+1. `migrate` — схема и роли `admin` / `user` (их создаёт data-миграция);
+2. `seed_groups` — на случай, если роль удалили руками;
+3. `seed_demo_users` — **только если** `SEED_DEMO_USERS=1`;
+4. `collectstatic` — статика для whitenoise;
+5. `exec` на команду из `CMD`, то есть gunicorn.
+
+В `docker-compose.yml` флаг включён, поэтому сразу после `up` можно войти как
+`demo_admin` / `demo-password-123`. Для боевого запуска уберите переменную или
+поставьте `"0"` — в самом образе сид по умолчанию выключен, аккаунты с известным
+паролем в бою не нужны.
 
 ```bash
-docker compose exec web python manage.py createsuperuser
+docker compose exec web python manage.py createsuperuser   # свой аккаунт
+docker compose logs -f web                                 # логи, включая шаги старта
 ```
+
+### Что происходит с данными
+
+База лежит в именованном томе `pgdata`, а не внутри контейнера, поэтому:
+
+| Команда | Что с данными |
+| --- | --- |
+| `docker compose stop` / `restart` | сохраняются |
+| `docker compose down` | сохраняются (удаляются только контейнеры) |
+| `docker compose up` после выключения компьютера | сохраняются |
+| `docker compose down -v` | **удаляются вместе с томом** |
+
+То есть пропасть данные могут только от явного `-v`. При следующем старте
+entrypoint снова прогонит миграции и сид — на пустой базе получится чистый
+стенд, на существующей ничего не сломается: обе команды идемпотентны.
 
 ## Проверить, что пароли захешированы
 
@@ -333,6 +360,3 @@ tests/            pytest-django
   (описание роли понадобится — заведём `Role` с `OneToOne` на `Group`).
 
 Стандартный `/admin/` включён, но задача решена своей страницей `/manage/`.
-#   d j a n g o _ a p p l i c a t i o n 
- 
- 
