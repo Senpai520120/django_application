@@ -5,15 +5,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.lock ./
+RUN pip install --no-cache-dir -r requirements.lock
 
 COPY . .
 
-RUN chmod +x /app/docker/entrypoint.sh
+# Статика собирается на сборке, а не на каждом старте контейнера.
+# SECRET_KEY здесь фиктивный: collectstatic его не использует, но настройки требуют.
+RUN SECRET_KEY=build-time-only DEBUG=False python manage.py collectstatic --noinput \
+    && chmod +x /app/docker/entrypoint.sh \
+    && useradd --create-home --uid 1000 app \
+    && chown -R app:app /app
+
+USER app
 
 EXPOSE 8000
 
-# entrypoint готовит БД и статику, CMD говорит, что запускать после этого.
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--access-logfile", "-"]

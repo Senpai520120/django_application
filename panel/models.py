@@ -1,8 +1,4 @@
-"""Модели панели.
-
-Пользователи и роли — встроенные `auth.User` и `auth.Group`, своих моделей для
-них нет. Здесь живёт только аудит-лог изменений ролей.
-"""
+"""Аудит-лог изменений ролей."""
 
 from django.conf import settings
 from django.contrib.auth.models import Group
@@ -29,7 +25,9 @@ class RoleChange(models.Model):
     )
     target = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="role_changes_received",
         verbose_name="кому",
     )
@@ -41,8 +39,9 @@ class RoleChange(models.Model):
         related_name="role_changes",
         verbose_name="роль",
     )
-    # Имя роли дублируется строкой, чтобы запись аудита пережила удаление группы.
+    # Имена дублируем строкой, чтобы запись пережила удаление группы и юзера.
     group_name = models.CharField("имя роли", max_length=150)
+    target_username = models.CharField("кому (логин)", max_length=150)
     action = models.CharField("действие", max_length=16, choices=ACTION_CHOICES)
     created_at = models.DateTimeField("когда", auto_now_add=True, db_index=True)
 
@@ -56,16 +55,12 @@ class RoleChange(models.Model):
         verb = self.get_action_display()
         return (
             f"{actor}: роль «{self.group_name}» {verb} "
-            f"пользователю {self.target.username}"
+            f"пользователю {self.target_username}"
         )
 
     @classmethod
     def log_diff(cls, *, actor, target, before, after):
-        """Записывает разницу между старым и новым набором ролей.
-
-        `before` и `after` — множества объектов `Group`. Возвращает список
-        созданных записей (пустой, если ничего не изменилось).
-        """
+        """Пишет разницу двух множеств Group. Возвращает созданные записи."""
         added = sorted(set(after) - set(before), key=lambda group: group.name)
         removed = sorted(set(before) - set(after), key=lambda group: group.name)
 
@@ -73,6 +68,7 @@ class RoleChange(models.Model):
             cls(
                 actor=actor,
                 target=target,
+                target_username=target.username,
                 group=group,
                 group_name=group.name,
                 action=action,

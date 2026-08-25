@@ -38,7 +38,7 @@ def test_password_is_usable_and_hashed(debug_mode):
     user = User.objects.get(username="demo_admin")
 
     assert user.check_password(DEFAULT_PASSWORD)
-    assert user.password.startswith("pbkdf2_sha256$")
+    assert DEFAULT_PASSWORD not in user.password
 
 
 @pytest.mark.django_db

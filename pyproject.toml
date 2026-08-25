@@ -23,7 +23,7 @@ select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "DJ"]
 known-first-party = ["accounts", "config", "panel"]
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "config.settings"
+DJANGO_SETTINGS_MODULE = "config.settings_test"
 python_files = ["test_*.py"]
 testpaths = ["tests"]
 addopts = "-q"

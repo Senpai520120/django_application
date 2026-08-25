@@ -1,13 +1,12 @@
 # Users & Roles
 
-Django-приложение: пользователи логинятся встроенными вьюхами Django, а админ
-через **собственную** страницу `/manage/` (не через `/admin/`) смотрит список
-пользователей и ролей и назначает/снимает роли.
+Пользователи логинятся встроенными вьюхами Django, а админ через собственную
+страницу `/manage/` (не через `/admin/`) смотрит список пользователей и ролей и
+назначает или снимает роли.
 
-Главный принцип проекта: **не переписывать то, что Django даёт из коробки**.
-Пользователь — стандартный `django.contrib.auth.models.User`, роль — стандартная
-`django.contrib.auth.models.Group`, логин/логаут/хеширование/сессии — из
-`django.contrib.auth`. Руками написаны только панель, контроль доступа и шаблоны.
+Пользователь — стандартный `auth.User`, роль — стандартная `auth.Group`,
+логин, логаут, хеширование и сессии — из `django.contrib.auth`. Руками написаны
+панель, контроль доступа и шаблоны.
 
 ## Стек
 
@@ -20,7 +19,7 @@ Django-приложение: пользователи логинятся вст�
 | Аутентификация | `django.contrib.auth`, сессии, встроенные `LoginView` / `LogoutView` |
 | Роли | встроенные `auth.Group` |
 | Конфигурация | `django-environ`, всё из переменных окружения |
-| Тесты | pytest + pytest-django, 43 теста, покрытие 98% |
+| Тесты | pytest + pytest-django, 50 тестов, покрытие 97% |
 | Линт | ruff + black, локально через pre-commit |
 | CI/CD | GitHub Actions: линтеры → проверки Django → тесты → smoke docker compose → публикация образа в GHCR |
 
@@ -52,11 +51,11 @@ python manage.py seed_demo_users
 # 7. Хуки перед коммитом (ruff, black, проверки Django)
 pre-commit install
 
-# 8. Поехали
+# 8. Запуск
 python manage.py runserver
 ```
 
-Дальше:
+Проверить:
 
 * http://127.0.0.1:8000/login/ — вход;
 * http://127.0.0.1:8000/ — «Вы вошли как X, ваши роли: …»;
@@ -130,11 +129,13 @@ python manage.py seed_demo_users --delete     # удалить всех demo_*
 | `SECURE_HSTS_SECONDS` | `0` | HSTS |
 | `SECURE_HSTS_INCLUDE_SUBDOMAINS` | `False` | HSTS для поддоменов |
 | `SECURE_HSTS_PRELOAD` | `False` | HSTS preload |
+| `USE_X_FORWARDED_PROTO` | `False` | доверять `X-Forwarded-Proto` от прокси |
+| `LOG_LEVEL` | `INFO` | уровень логов в stdout |
 | `CSRF_TRUSTED_ORIGINS` | пусто | нужно за HTTPS-прокси |
 
-`*_SECURE`-флаги по умолчанию выключены намеренно: на локальном HTTP браузер
-не сохранит secure-cookie и логин просто перестанет работать. Перед выкладкой
-на HTTPS включите их и проверьте `python manage.py check --deploy`.
+`*_SECURE`-флаги выключены по умолчанию: на локальном HTTP браузер не сохранит
+secure-cookie и логин перестанет работать. Перед выкладкой на HTTPS включите их
+и проверьте `python manage.py check --deploy`.
 
 ## Что взято из коробки, а что написано руками
 
@@ -173,6 +174,7 @@ python manage.py seed_demo_users --delete     # удалить всех demo_*
 | `panel/models.py` | `RoleChange` — аудит изменений ролей (бонус) |
 | `templates/` | все шаблоны, включая `registration/login.html`, 403/404/500 |
 | `config/settings.py` | настройки на `django-environ` |
+| `config/settings_test.py` | настройки для тестов |
 | `.pre-commit-config.yaml` | хуки линтеров перед коммитом |
 | `.github/workflows/ci.yml` | пайплайн CI/CD |
 
@@ -199,10 +201,15 @@ class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
 ## Тесты
 
 ```bash
-pytest                                  # 43 теста
+pytest                                  # 50 тестов
 pytest -v
-pytest --cov --cov-report=term-missing  # покрытие (сейчас 98%)
+pytest --cov --cov-report=term-missing  # покрытие (сейчас 97%)
 ```
+
+Тесты используют `config/settings_test.py`: свой `SECRET_KEY`, статика без
+манифеста и быстрый хешер паролей. Поэтому `pytest` работает на свежем клоне,
+без `.env` и без `collectstatic`. Боевой хешер проверяется отдельным тестом,
+который включает `PBKDF2PasswordHasher` явно.
 
 Покрыто:
 
@@ -272,7 +279,7 @@ CD доведён до публикации образа: дальше на св
 DATABASE_URL=postgres://users_roles:users_roles@localhost:5432/users_roles
 ```
 
-Драйвер (`psycopg[binary]`) уже в `requirements.txt`. Дальше как обычно:
+Драйвер `psycopg[binary]` уже в `requirements.txt`, дальше обычный
 `python manage.py migrate`.
 
 ## Docker
@@ -300,6 +307,14 @@ docker compose up --build
 docker compose exec web python manage.py createsuperuser   # свой аккаунт
 docker compose logs -f web                                 # логи, включая шаги старта
 ```
+
+Статика собирается на этапе сборки образа, зависимости ставятся из
+`requirements.lock` (генерируется `pip-compile requirements.txt`), процесс внутри
+контейнера работает от непривилегированного пользователя `app`.
+
+`migrate` в entrypoint рассчитан на один инстанс — при нескольких репликах они
+будут стартовать одновременно и гонки за миграции никто не разруливает. Это
+осознанное упрощение: в проде миграции гоняют отдельным шагом деплоя.
 
 ### Что происходит с данными
 
@@ -348,9 +363,20 @@ static/css/       единственный css-файл
 tests/            pytest-django
 ```
 
-## Границы задачи
+## Известные ограничения
 
-Сознательно не делалось (вне scope):
+* Аудит покрывает только изменение ролей. Создание пользователя и
+  активация/деактивация в `RoleChange` не пишутся: модель заточена под роли.
+  Чтобы логировать всё, её нужно обобщить до `AuditEntry` с полем `action`.
+* Нет защиты от перебора паролей. Форма логина не ограничивает попытки — в
+  боевом проекте сюда ставят `django-axes` или rate limit на уровне nginx.
+* `is_admin()` считает админом и участника группы `admin`, и любого `is_staff`.
+  Снять `is_staff` через панель нельзя — только через `/admin/` или shell;
+  в списке пользователей такие флаги видны отдельной колонкой.
+
+## Что не делалось
+
+Вне scope задачи:
 
 * регистрация пользователей через публичный UI — аккаунты заводит админ или
   `createsuperuser`;

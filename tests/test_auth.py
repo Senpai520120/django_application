@@ -66,12 +66,15 @@ def test_inactive_user_cannot_login(client, plain_user, password):
 
 
 @pytest.mark.django_db
-def test_password_is_stored_hashed(plain_user, password):
-    """В таблице auth_user лежит хеш, а не пароль в открытом виде."""
+def test_password_is_stored_hashed(settings, password):
+    """В auth_user лежит хеш, а не пароль. Хешер берём боевой, не тестовый."""
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.PBKDF2PasswordHasher"]
+    user = User.objects.create_user(username="hashcheck", password=password)
+
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT password FROM auth_user WHERE username = %s",
-            [plain_user.username],
+            [user.username],
         )
         stored = cursor.fetchone()[0]
 

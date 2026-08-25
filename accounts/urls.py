@@ -1,8 +1,3 @@
-"""Маршруты аутентификации и домашней страницы.
-
-Логин/логаут — встроенные вьюхи Django, свои у нас только шаблоны.
-"""
-
 from django.contrib.auth import views as auth_views
 from django.urls import path
 

@@ -1,24 +1,29 @@
-"""Единая точка правды о том, кто такой «админ» в этом проекте.
-
-Роли — это встроенные группы Django (`auth.Group`), отдельной модели Role нет.
-"""
+"""Кто считается админом. Роли — встроенные auth.Group."""
 
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 
 ADMIN_GROUP_NAME = "admin"
 USER_GROUP_NAME = "user"
 
-#: Роли, которые создаёт сид (data-миграция и команда `seed_groups`).
 DEFAULT_GROUP_NAMES = (ADMIN_GROUP_NAME, USER_GROUP_NAME)
 
 
 def is_admin(user: AbstractBaseUser | AnonymousUser) -> bool:
-    """Имеет ли пользователь доступ к панели /manage/.
+    """Участник группы admin, is_staff или суперпользователь.
 
-    Админ — это участник группы `admin`, либо `is_staff`, либо суперпользователь.
+    Результат кешируется на объекте пользователя: за запрос проверку зовут
+    и миксин, и контекст-процессор, а запрос к БД нужен один.
     """
+    cached = getattr(user, "_is_panel_admin", None)
+    if cached is not None:
+        return cached
+
     if not user.is_authenticated:
-        return False
-    if user.is_superuser or user.is_staff:
-        return True
-    return user.groups.filter(name=ADMIN_GROUP_NAME).exists()
+        result = False
+    elif user.is_superuser or user.is_staff:
+        result = True
+    else:
+        result = user.groups.filter(name=ADMIN_GROUP_NAME).exists()
+
+    user._is_panel_admin = result
+    return result

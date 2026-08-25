@@ -96,7 +96,6 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgres://users_roles:users_roles@localhost:5432/users_roles
-      STATICFILES_BACKEND: django.contrib.staticfiles.storage.StaticFilesStorage
     steps:
       - uses: actions/checkout@v4
 

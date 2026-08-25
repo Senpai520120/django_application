@@ -1,5 +1,3 @@
-"""Маршруты кастомной панели (/manage/)."""
-
 from django.urls import path
 
 from panel import views

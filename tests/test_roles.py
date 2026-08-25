@@ -1,5 +1,7 @@
 """Назначение и снятие ролей через панель."""
 
+from urllib.parse import quote
+
 import pytest
 from django.test import Client
 from django.urls import reverse
@@ -98,3 +100,80 @@ def test_post_without_csrf_token_is_rejected(group_admin, plain_user, admin_grou
 
     assert response.status_code == 403
     assert not plain_user.groups.filter(name="admin").exists()
+
+
+@pytest.mark.django_db
+def test_admin_cannot_take_admin_role_from_himself(client, group_admin, admin_group):
+    """Иначе последний админ закрывает панель сам себе и лечится только shell."""
+    client.force_login(group_admin)
+
+    response = client.post(
+        reverse("panel:user_roles", args=[group_admin.pk]), {"groups": []}
+    )
+
+    assert response.status_code == 200
+    assert "groups" in response.context["form"].errors
+    assert group_admin.groups.filter(name="admin").exists()
+    assert client.get(reverse("panel:user_list")).status_code == 200
+
+
+@pytest.mark.django_db
+def test_superuser_may_drop_own_group(client, superuser, admin_group):
+    """Запрет точечный: суперюзер не теряет доступ, снимая группу."""
+    superuser.groups.add(admin_group)
+    client.force_login(superuser)
+
+    response = client.post(
+        reverse("panel:user_roles", args=[superuser.pk]), {"groups": []}
+    )
+
+    assert response.status_code == 302
+    assert superuser.groups.count() == 0
+    assert client.get(reverse("panel:user_list")).status_code == 200
+
+
+@pytest.mark.django_db
+def test_audit_survives_deletion_of_the_user(
+    client, group_admin, plain_user, admin_group
+):
+    client.force_login(group_admin)
+    client.post(
+        reverse("panel:user_roles", args=[plain_user.pk]), {"groups": [admin_group.pk]}
+    )
+    username = plain_user.username
+
+    plain_user.delete()
+
+    changes = RoleChange.objects.all()
+    assert changes.count() == 2
+    assert {change.target_username for change in changes} == {username}
+    assert changes.first().target is None
+
+
+@pytest.mark.django_db
+def test_after_saving_roles_admin_returns_to_the_same_list_page(
+    client, group_admin, plain_user, admin_group
+):
+    client.force_login(group_admin)
+    back = f"{reverse('panel:user_list')}?q=ivan&page=1"
+    # Шаблон кладёт адрес в ?next= через фильтр urlencode.
+    next_param = quote(back, safe="/")
+
+    response = client.post(
+        f"{reverse('panel:user_roles', args=[plain_user.pk])}?next={next_param}",
+        {"groups": [admin_group.pk]},
+    )
+
+    assert response.url == back
+
+
+@pytest.mark.django_db
+def test_open_redirect_through_next_is_ignored(client, group_admin, plain_user):
+    client.force_login(group_admin)
+
+    response = client.post(
+        f"{reverse('panel:user_roles', args=[plain_user.pk])}?next=https://evil.example",
+        {"groups": []},
+    )
+
+    assert response.url == reverse("panel:user_list")

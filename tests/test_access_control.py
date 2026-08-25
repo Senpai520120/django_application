@@ -83,3 +83,22 @@ def test_admin_sees_panel_link_on_home(client, group_admin):
     response = client.get(reverse("home"))
 
     assert reverse("panel:user_list") in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_permission_check_costs_one_query(client, group_admin):
+    """Проверку зовут и миксин, и контекст-процессор — запрос должен быть один."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    client.force_login(group_admin)
+
+    with CaptureQueriesContext(connection) as queries:
+        client.get(reverse("panel:user_list"))
+
+    group_checks = [
+        query["sql"]
+        for query in queries.captured_queries
+        if 'SELECT 1 AS "a"' in query["sql"] and "auth_user_groups" in query["sql"]
+    ]
+    assert len(group_checks) == 1

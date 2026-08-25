@@ -1,8 +1,4 @@
-"""Настройки проекта «Users & Roles».
-
-Все секреты и окружение-зависимые параметры читаются из переменных окружения
-(файл `.env` в корне проекта, см. `.env.example`). В коде хардкода нет.
-"""
+"""Настройки проекта. Секреты и окружение — из .env, см. .env.example."""
 
 from pathlib import Path
 
@@ -25,7 +21,6 @@ env = environ.Env(
     SECURE_HSTS_PRELOAD=(bool, False),
 )
 
-# Файла может не быть (например, в CI) — тогда берём переменные из окружения.
 environ.Env.read_env(BASE_DIR / ".env")
 
 DEBUG = env("DEBUG")
@@ -33,17 +28,15 @@ DEBUG = env("DEBUG")
 SECRET_KEY = env("SECRET_KEY")
 if not SECRET_KEY:
     raise ImproperlyConfigured(
-        "Переменная окружения SECRET_KEY не задана. "
-        "Скопируйте .env.example в .env и заполните её "
-        "(см. раздел «Переменные окружения» в README)."
+        "SECRET_KEY не задан. Скопируйте .env.example в .env и заполните его."
     )
+if SECRET_KEY == "change-me" and not DEBUG:
+    raise ImproperlyConfigured("SECRET_KEY остался плейсхолдером из .env.example.")
 
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
 
 INSTALLED_APPS = [
-    # Стандартная админка оставлена включённой как референс,
-    # рабочая панель проекта живёт на /manage/ (приложение panel).
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -99,7 +92,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# Аутентификация: полностью на встроенных вьюхах django.contrib.auth.
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"
 LOGOUT_REDIRECT_URL = "login"
@@ -113,8 +105,7 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# В проде статику раздаёт whitenoise с манифестом (нужен `collectstatic`),
-# в разработке — обычное хранилище. Переопределяется через STATICFILES_BACKEND.
+# С манифестом нужен collectstatic, поэтому в разработке обычное хранилище.
 _default_staticfiles_backend = (
     "django.contrib.staticfiles.storage.StaticFilesStorage"
     if DEBUG
@@ -129,13 +120,33 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Безопасность. За HTTPS-прокси включите *_SECURE-флаги через .env.
+# Включать только за HTTPS: на http браузер выбросит secure-cookie
+# и логин перестанет работать.
 SESSION_COOKIE_SECURE = env("SESSION_COOKIE_SECURE")
 CSRF_COOKIE_SECURE = env("CSRF_COOKIE_SECURE")
 SECURE_SSL_REDIRECT = env("SECURE_SSL_REDIRECT")
 SECURE_HSTS_SECONDS = env("SECURE_HSTS_SECONDS")
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env("SECURE_HSTS_INCLUDE_SUBDOMAINS")
 SECURE_HSTS_PRELOAD = env("SECURE_HSTS_PRELOAD")
+# За TLS-терминирующим прокси: без этого SECURE_SSL_REDIRECT зациклится.
+if env.bool("USE_X_FORWARDED_PROTO", default=False):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 SESSION_COOKIE_HTTPONLY = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "simple": {"format": "{asctime} {levelname} {name}: {message}", "style": "{"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "simple"},
+    },
+    "root": {"handlers": ["console"], "level": env("LOG_LEVEL", default="INFO")},
+    "loggers": {
+        "django.request": {"level": "ERROR", "propagate": True},
+    },
+}

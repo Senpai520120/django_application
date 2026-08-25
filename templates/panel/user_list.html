@@ -21,6 +21,7 @@
         <th>Email</th>
         <th>Имя</th>
         <th>Роли</th>
+        <th>Флаги</th>
         <th>Активен</th>
         <th>Действия</th>
       </tr>
@@ -38,17 +39,23 @@
               <em>—</em>
             {% endfor %}
           </td>
+          <td>
+            {% if row.is_superuser %}<span class="badge">superuser</span>{% endif %}
+            {% if row.is_staff %}<span class="badge">staff</span>{% endif %}
+            {% if not row.is_superuser and not row.is_staff %}<em>—</em>{% endif %}
+          </td>
           <td>{% if row.is_active %}да{% else %}нет{% endif %}</td>
           <td class="actions">
-            <a href="{% url 'panel:user_roles' row.pk %}">Роли</a>
+            <a href="{% url 'panel:user_roles' row.pk %}?next={{ request.get_full_path|urlencode }}">Роли</a>
             <form method="post" action="{% url 'panel:user_toggle_active' row.pk %}" class="inline">
               {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
               <button type="submit">{% if row.is_active %}Деактивировать{% else %}Активировать{% endif %}</button>
             </form>
           </td>
         </tr>
       {% empty %}
-        <tr><td colspan="6"><em>Ничего не найдено.</em></td></tr>
+        <tr><td colspan="7"><em>Ничего не найдено.</em></td></tr>
       {% endfor %}
     </tbody>
   </table>

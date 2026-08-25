@@ -1,7 +1,5 @@
-# В репозитории и рабочей копии — LF. Иначе Windows-CRLF ломает shell-скрипты
-# в Docker и спорит с хуком mixed-line-ending.
+# LF везде: CRLF ломает shell-скрипты внутри контейнера.
 * text=auto eol=lf
-# CRLF в shell-скрипте ломает shebang внутри контейнера.
 *.sh text eol=lf
 
 *.png binary

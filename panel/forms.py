@@ -1,40 +1,57 @@
-"""Формы панели. Максимум переиспользования встроенных форм Django."""
-
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import Group, User
+from django.utils.translation import gettext_lazy as _
+
+from accounts.permissions import ADMIN_GROUP_NAME
 
 
 def roles_field(**kwargs):
-    """Чекбоксы со всеми существующими ролями (группами)."""
-    kwargs.setdefault("label", "Роли")
+    """Чекбоксы со всеми ролями."""
+    kwargs.setdefault("label", _("Роли"))
     kwargs.setdefault("required", False)
     return forms.ModelMultipleChoiceField(
         queryset=Group.objects.order_by("name"),
         widget=forms.CheckboxSelectMultiple,
-        help_text="Отметьте роли, которые должны быть у пользователя.",
+        help_text=_("Отметьте роли, которые должны быть у пользователя."),
         **kwargs,
     )
 
 
 class UserRolesForm(forms.ModelForm):
-    """Назначение и снятие ролей: обычная ModelForm поверх `User.groups`."""
-
     groups = roles_field()
 
     class Meta:
         model = User
         fields = ["groups"]
 
+    def __init__(self, *args, editor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.editor = editor
+
+    def clean_groups(self):
+        """Не дать администратору закрыть панель самому себе."""
+        groups = self.cleaned_data["groups"]
+        editing_self = self.editor is not None and self.editor.pk == self.instance.pk
+        if not editing_self:
+            return groups
+
+        keeps_access = (
+            self.editor.is_superuser
+            or self.editor.is_staff
+            or any(group.name == ADMIN_GROUP_NAME for group in groups)
+        )
+        if not keeps_access:
+            raise forms.ValidationError(
+                _("Нельзя снять с себя роль admin: вы потеряете доступ к панели.")
+            )
+        return groups
+
 
 class PanelUserCreationForm(UserCreationForm):
-    """Создание пользователя админом (бонус).
+    """Поверх UserCreationForm: валидация и хеширование пароля уже там."""
 
-    Наследуемся от встроенной `UserCreationForm`: валидация пароля и его
-    хеширование достаются из коробки.
-    """
-
-    email = forms.EmailField(label="Email", required=False)
+    email = forms.EmailField(label=_("Email"), required=False)
     groups = roles_field()
 
     class Meta(UserCreationForm.Meta):

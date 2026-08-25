@@ -14,9 +14,10 @@ def test_user_list_shows_users_with_roles(client, group_admin, plain_user):
     response = client.get(reverse("panel:user_list"))
     content = response.content.decode()
 
-    assert plain_user.username in content
+    assert list(response.context["users"]) == [group_admin, plain_user]
     assert plain_user.email in content
-    assert "user" in content
+    # Именно бейдж роли, а не слово "user", которое есть в разметке всегда.
+    assert '<span class="badge">user</span>' in content
 
 
 @pytest.mark.django_db
@@ -126,3 +127,18 @@ def test_audit_log_page_lists_changes(client, group_admin, plain_user, admin_gro
     assert response.status_code == 200
     assert group_admin.username in content
     assert plain_user.username in content
+
+
+@pytest.mark.django_db
+def test_user_list_has_no_n_plus_one(client, group_admin, django_assert_num_queries):
+    """Число запросов не должно расти вместе с числом пользователей."""
+    client.force_login(group_admin)
+    url = reverse("panel:user_list")
+
+    with django_assert_num_queries(6):
+        client.get(url)
+
+    User.objects.bulk_create(User(username=f"bulk{i:02d}") for i in range(9))
+
+    with django_assert_num_queries(6):
+        client.get(url)

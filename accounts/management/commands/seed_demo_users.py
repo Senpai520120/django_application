@@ -1,8 +1,4 @@
-"""Тестовые пользователи для локальной проверки приложения.
-
-Команда идемпотентна: повторный запуск не плодит дубликаты, а приводит уже
-существующих демо-юзеров к описанному здесь состоянию (пароль, роли, флаги).
-"""
+"""Тестовые пользователи для локальной проверки."""
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -11,12 +7,12 @@ from django.db import transaction
 
 from accounts.permissions import ADMIN_GROUP_NAME, USER_GROUP_NAME
 
-#: Префикс, по которому команда узнаёт «свои» аккаунты (в том числе при --delete).
+# По этому префиксу команда узнаёт свои аккаунты, в том числе при --delete.
 DEMO_PREFIX = "demo_"
 
 DEFAULT_PASSWORD = "demo-password-123"
 
-#: username, имя, фамилия, роли, is_staff, is_active, зачем нужен
+# username, имя, фамилия, роли, is_staff, is_active, комментарий
 DEMO_USERS = [
     (
         "demo_admin",
@@ -92,7 +88,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--delete",
             action="store_true",
-            help="удалить всех demo_*-пользователей и выйти",
+            help=f"удалить всех пользователей с префиксом {DEMO_PREFIX} и выйти",
         )
         parser.add_argument(
             "--force",
@@ -116,6 +112,13 @@ class Command(BaseCommand):
             return
 
         extra = max(0, min(options["extra"], len(EXTRA_NAMES)))
+        if options["extra"] > len(EXTRA_NAMES):
+            self.stderr.write(
+                self.style.WARNING(
+                    f"Запрошено {options['extra']} дополнительных юзеров, "
+                    f"а имён в списке {len(EXTRA_NAMES)} — создам {extra}."
+                )
+            )
         password = options["password"]
 
         with transaction.atomic():
@@ -140,7 +143,7 @@ class Command(BaseCommand):
         self.report(rows, password)
 
     def upsert(self, spec, password, groups):
-        """Создаёт или обновляет одного демо-юзера. Возвращает строку для отчёта."""
+        """Создаёт или обновляет юзера, возвращает строку для отчёта."""
         username, first_name, last_name, role_names, is_staff, is_active, note = spec
 
         user, created = User.objects.get_or_create(username=username)

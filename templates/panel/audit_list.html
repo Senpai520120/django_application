@@ -16,7 +16,7 @@
           <td>{{ change.actor.username|default:"система" }}</td>
           <td>{{ change.get_action_display }}</td>
           <td><span class="badge">{{ change.group_name }}</span></td>
-          <td>{{ change.target.username }}</td>
+          <td>{{ change.target_username }}</td>
         </tr>
       {% empty %}
         <tr><td colspan="5"><em>Изменений пока не было.</em></td></tr>

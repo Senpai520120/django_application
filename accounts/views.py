@@ -1,12 +1,8 @@
-"""Вьюхи для обычного пользователя."""
-
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 
 
 class HomeView(LoginRequiredMixin, TemplateView):
-    """Домашняя страница: кто вошёл и какие у него роли."""
-
     template_name = "accounts/home.html"
 
     def get_context_data(self, **kwargs):
