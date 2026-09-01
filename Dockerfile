@@ -12,7 +12,8 @@ COPY . .
 
 # Статика собирается на сборке, а не на каждом старте контейнера.
 # SECRET_KEY здесь фиктивный: collectstatic его не использует, но настройки требуют.
-RUN SECRET_KEY=build-time-only DEBUG=False python manage.py collectstatic --noinput \
+RUN mkdir -p /app/filemanager \
+    && SECRET_KEY=build-time-only DEBUG=False python manage.py collectstatic --noinput \
     && chmod +x /app/docker/entrypoint.sh \
     && useradd --create-home --uid 1000 app \
     && chown -R app:app /app

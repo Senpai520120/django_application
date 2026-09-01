@@ -19,6 +19,9 @@ env = environ.Env(
     SECURE_HSTS_SECONDS=(int, 0),
     SECURE_HSTS_INCLUDE_SUBDOMAINS=(bool, False),
     SECURE_HSTS_PRELOAD=(bool, False),
+    FILE_STORAGE_BACKEND=(str, "local"),
+    FILE_MANAGER_MAX_FILE_SIZE=(int, 25 * 1024 * 1024),
+    FILE_MANAGER_MAX_TOTAL_SIZE=(int, 512 * 1024 * 1024),
 )
 
 environ.Env.read_env(BASE_DIR / ".env")
@@ -45,6 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "accounts",
     "panel",
+    "files",
 ]
 
 MIDDLEWARE = [
@@ -111,12 +115,42 @@ _default_staticfiles_backend = (
     if DEBUG
     else "whitenoise.storage.CompressedManifestStaticFilesStorage"
 )
+# Файловый менеджер: local — диск сервера, s3 — бакет через django-storages.
+FILE_STORAGE_BACKEND = env("FILE_STORAGE_BACKEND")
+_default_file_backends = {
+    "local": "django.core.files.storage.FileSystemStorage",
+    "s3": "storages.backends.s3.S3Storage",
+}
+if FILE_STORAGE_BACKEND not in _default_file_backends:
+    raise ImproperlyConfigured(
+        f"FILE_STORAGE_BACKEND={FILE_STORAGE_BACKEND!r}: ожидается local или s3."
+    )
+
 STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "default": {"BACKEND": _default_file_backends[FILE_STORAGE_BACKEND]},
     "staticfiles": {
         "BACKEND": env("STATICFILES_BACKEND", default=_default_staticfiles_backend)
     },
 }
+
+FILE_MANAGER = {
+    "BACKEND": FILE_STORAGE_BACKEND,
+    "ROOT": env("FILE_MANAGER_ROOT", default=str(BASE_DIR / "filemanager")),
+    "S3_LOCATION": env("FILE_MANAGER_S3_LOCATION", default="filemanager"),
+    "MAX_FILE_SIZE": env("FILE_MANAGER_MAX_FILE_SIZE"),
+    "MAX_TOTAL_SIZE": env("FILE_MANAGER_MAX_TOTAL_SIZE"),
+}
+
+# Читается django-storages. Ключи в коде не хранятся: только окружение или
+# IAM-роль инстанса, когда переменные не заданы.
+AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="")
+AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="eu-central-1")
+AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default=None)
+AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default=None)
+AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default=None)
+AWS_DEFAULT_ACL = None
+AWS_S3_FILE_OVERWRITE = False
+AWS_QUERYSTRING_AUTH = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

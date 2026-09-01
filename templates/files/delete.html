@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Удалить {{ name }}{% endblock %}
+
+{% block content %}
+  <h1>Удалить {% if is_dir %}папку{% else %}файл{% endif %} «{{ name }}»?</h1>
+
+  {% if is_dir %}
+    <p class="warning" data-testid="recursive-warning">
+      Папка будет удалена вместе со всем содержимым. Действие необратимо.
+    </p>
+  {% else %}
+    <p>Файл будет удалён безвозвратно.</p>
+  {% endif %}
+
+  <form method="post" class="card form-narrow">
+    {% csrf_token %}
+    <input type="hidden" name="path" value="{{ path }}">
+    <button type="submit" data-testid="delete-confirm">Удалить</button>
+    <a href="{% url 'files:browse' %}?path={{ parent|urlencode }}" data-testid="delete-cancel">Отмена</a>
+  </form>
+{% endblock %}

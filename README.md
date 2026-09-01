@@ -18,9 +18,11 @@
 | Frontend | Django templates (SSR) + один файл CSS |
 | Аутентификация | `django.contrib.auth`, сессии, встроенные `LoginView` / `LogoutView` |
 | Роли | встроенные `auth.Group` |
+| Хранилище файлов | `FileSystemStorage` или S3 через django-storages, выбор переменной окружения |
 | Конфигурация | `django-environ`, всё из переменных окружения |
 | Тесты | pytest + pytest-django, 50 тестов, покрытие 97% |
 | Линт | ruff + black, локально через pre-commit |
+| E2E | Playwright (chromium), сценарии файлового менеджера |
 | CI/CD | GitHub Actions: линтеры → проверки Django → тесты → smoke docker compose → публикация образа в GHCR |
 
 ## Быстрый старт
@@ -99,6 +101,12 @@ python manage.py seed_demo_users --delete     # удалить всех demo_*
 | `/login/` | вход, встроенная `LoginView` + свой шаблон | все |
 | `/logout/` | выход, встроенная `LogoutView` (только POST) | все |
 | `/` | домашняя страница: кто вы и какие у вас роли | залогиненные |
+| `/files/` | файловый менеджер: список папки, навигация | залогиненные |
+| `/files/folder/new/` | создание папки (POST) | залогиненные |
+| `/files/upload/` | загрузка файлов (POST) | залогиненные |
+| `/files/rename/` | переименование файла или папки | залогиненные |
+| `/files/delete/` | удаление с подтверждением | залогиненные |
+| `/files/download/` | скачивание файла вложением | залогиненные |
 | `/manage/` | список пользователей: поиск, пагинация, роли, активность | админы |
 | `/manage/roles/` | список ролей и число участников | админы |
 | `/manage/users/<pk>/roles/` | форма назначения/снятия ролей | админы |
@@ -131,6 +139,15 @@ python manage.py seed_demo_users --delete     # удалить всех demo_*
 | `SECURE_HSTS_PRELOAD` | `False` | HSTS preload |
 | `USE_X_FORWARDED_PROTO` | `False` | доверять `X-Forwarded-Proto` от прокси |
 | `LOG_LEVEL` | `INFO` | уровень логов в stdout |
+| `FILE_STORAGE_BACKEND` | `local` | `local` — диск сервера, `s3` — бакет AWS |
+| `FILE_MANAGER_ROOT` | `<корень>/filemanager` | папка хранилища при `local` |
+| `FILE_MANAGER_MAX_FILE_SIZE` | `26214400` | лимит на один файл, байты |
+| `FILE_MANAGER_MAX_TOTAL_SIZE` | `536870912` | лимит на всё хранилище, байты |
+| `FILE_MANAGER_S3_LOCATION` | `filemanager` | префикс ключей в бакете |
+| `AWS_STORAGE_BUCKET_NAME` | пусто | бакет, обязателен при `s3` |
+| `AWS_S3_REGION_NAME` | `eu-central-1` | регион бакета |
+| `AWS_S3_ENDPOINT_URL` | пусто | адрес S3-эмулятора для локальной проверки |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | пусто | не задаются на EC2: работает IAM-роль |
 | `CSRF_TRUSTED_ORIGINS` | пусто | нужно за HTTPS-прокси |
 
 `*_SECURE`-флаги выключены по умолчанию: на локальном HTTP браузер не сохранит
@@ -172,6 +189,12 @@ secure-cookie и логин перестанет работать. Перед в
 | `panel/views.py` | вьюхи панели `/manage/` |
 | `panel/forms.py` | форма ролей и форма создания пользователя |
 | `panel/models.py` | `RoleChange` — аудит изменений ролей (бонус) |
+| `files/paths.py` | нормализация путей и имён, защита от path traversal |
+| `files/storage.py` | контракт хранилища и две реализации: диск и S3 |
+| `files/access.py` | правило доступа к разделу файлов |
+| `files/views.py` | список, загрузка, переименование, удаление, скачивание |
+| `e2e/` | Playwright: сценарии файлового менеджера в браузере |
+| `deploy/aws/` | Terraform: бакет, IAM-роль, инстанс |
 | `templates/` | все шаблоны, включая `registration/login.html`, 403/404/500 |
 | `config/settings.py` | настройки на `django-environ` |
 | `config/settings_test.py` | настройки для тестов |
@@ -198,10 +221,73 @@ class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
 залогиненный не-админ — `PermissionDenied`, то есть 403. Права проверяются на
 каждый запрос, поэтому снятая роль закрывает панель немедленно, без релогина.
 
+## Файловый менеджер
+
+Раздел `/files/`: дерево папок и файлов, создание папок, загрузка нескольких
+файлов за раз, переименование, скачивание и удаление с подтверждением.
+Хранилище переключается переменной окружения — вьюхи об этом не знают.
+
+**Кому доступен.** Всем залогиненным пользователям: это общий раздел команды, а
+не часть админ-панели, поэтому он живёт рядом с `/manage/`, а не внутри неё.
+Правило вынесено в `files/access.py` — чтобы отдать файлы только админам,
+достаточно поменять там базовый класс на `AdminRequiredMixin`.
+
+### Как устроено хранилище
+
+```
+files/storage.py
+├── FileManagerStorage   контракт: list_dir, make_dir, save, open, delete,
+│                        rename, exists, is_dir, size, total_size
+├── LocalFileStorage     поверх FileSystemStorage
+└── S3FileStorage        поверх S3Storage из django-storages
+```
+
+Backend выбирает `get_storage()` по `FILE_STORAGE_BACKEND`, он же задаёт
+`STORAGES["default"]` в настройках — тем же способом, каким `DATABASE_URL`
+выбирает базу. Третий backend добавляется новым подклассом: вьюхи и шаблоны
+не меняются.
+
+Папки в S3 виртуальные: пустая папка — это объект нулевого размера с ключом,
+оканчивающимся на `/`. Удаление папки удаляет все ключи с её префиксом,
+переименование копирует их на новый префикс и удаляет старые.
+
+### Режим S3
+
+```bash
+# в .env
+FILE_STORAGE_BACKEND=s3
+AWS_STORAGE_BUCKET_NAME=имя-бакета
+AWS_S3_REGION_NAME=eu-central-1
+```
+
+Ключи задавать не нужно, если приложение работает на EC2 с IAM-ролью — boto3
+возьмёт временные креды из метаданных инстанса. Локально проверить S3-режим без
+облака можно на localstack:
+
+```bash
+docker compose --profile s3 up --build
+# в .env дополнительно: AWS_S3_ENDPOINT_URL=http://localstack:4566
+```
+
+### Безопасность
+
+| Что | Как закрыто |
+| --- | --- |
+| Path traversal | `files/paths.py`: `..`, абсолютные пути, диски и null-байты отбиваются до обращения к хранилищу, ответ — 400 |
+| Симлинк наружу | локальное хранилище дополнительно сверяет уже разрешённый путь с корнем |
+| Имена файлов | запрещены разделители, управляющие символы, зарезервированные windows-имена, длина ограничена 120 символами |
+| Размер | лимит на файл и на суммарный объём хранилища, оба из переменных окружения |
+| Опасные расширения | скачивание всегда идёт с `Content-Disposition: attachment`, плюс `X-Content-Type-Options: nosniff` — браузер не выполнит `.html` или `.svg` |
+| Перезапись | файл с существующим именем не перезаписывается молча, а даёт ошибку |
+| Секреты | ключи AWS только в `.env` и в IAM-роли, в репозитории их нет |
+
+Все пункты закрыты тестами: `tests/test_files_paths.py`,
+`tests/test_files_storage.py`, `tests/test_files_views.py`.
+
 ## Тесты
 
 ```bash
-pytest                                  # 50 тестов
+pytest                                  # 156 тестов
 pytest -v
 pytest --cov --cov-report=term-missing  # покрытие (сейчас 97%)
 ```
@@ -226,10 +312,57 @@ pytest --cov --cov-report=term-missing  # покрытие (сейчас 97%)
   `seed_groups` идемпотентна;
 * `tests/test_seed_demo_users.py` — тестовые юзеры создаются с нужными ролями и
   флагами, команда идемпотентна, `--delete` не трогает чужие аккаунты, при
-  `DEBUG=False` без `--force` команда отказывается работать.
+  `DEBUG=False` без `--force` команда отказывается работать;
+* `tests/test_files_paths.py` — path traversal во всех видах, санитизация имён;
+* `tests/test_files_storage.py` — **контракт хранилища, прогнанный дважды**: для
+  локального диска и для S3 через `moto`. Один и тот же набор проверок, разные
+  реализации;
+* `tests/test_files_views.py` — доступ анонима, лимиты размера, вложение при
+  скачивании, рекурсивное удаление, 400 на путь наружу.
 
 Тестовое окружение задаётся в корневом `conftest.py` (там же `SECRET_KEY` для CI),
 фикстуры пользователей — в `tests/conftest.py`.
+
+## E2E-тесты (Playwright)
+
+Pytest проверяет бэкенд и вьюхи, Playwright — что сценарий работает в реальном
+браузере. Одно другое не заменяет.
+
+```bash
+cd e2e
+npm ci
+npx playwright install chromium
+BASE_URL=http://127.0.0.1:8000 npx playwright test      # против поднятого стека
+npx playwright show-report                              # отчёт после прогона
+```
+
+Приложение для тестов поднимается тем же `docker compose`, что и обычно.
+Пользователь берётся из `seed_demo_users` — `demo_admin` с паролем из README,
+переопределяется через `E2E_USERNAME` / `E2E_PASSWORD`.
+
+```
+e2e/
+├── playwright.config.ts   baseURL из окружения, retries только в CI,
+│                          trace on-first-retry, видео и скриншот при падении
+├── support/
+│   ├── fixtures.ts        логин, уникальные имена, фикстура workspace
+│   └── file-manager.page.ts   Page Object раздела
+├── auth.spec.ts           доступ анонима, вход, переход в раздел
+├── folders.spec.ts        создание, вложенность, крошки, дубликат, удаление
+└── files.spec.ts          загрузка (одного и нескольких), переименование,
+                           скачивание, удаление, файл больше лимита
+```
+
+Каждый тест работает в своей папке с уникальным именем и убирает её за собой —
+прогоны не зависят друг от друга и от порядка. Ожиданий по таймеру нет: только
+web-first assertions, которые сами дожидаются нужного состояния.
+
+**Про codegen.** Черновики сценариев снимались через `npx playwright codegen`,
+дальше приводились в порядок руками: локаторы заменены на `getByRole`,
+`getByLabel` и `getByTestId`, повторяющиеся шаги вынесены в Page Object и
+фикстуры, шаги подписаны через `test.step()`. Для устойчивых локаторов в
+шаблоны точечно добавлены `aria-label`, `role="status"` и `data-testid` — это
+честнее, чем цепляться за классы вёрстки.
 
 ## Линт и форматирование
 
@@ -264,8 +397,9 @@ venv.
 | **Линтеры** | `ruff check`, `black --check`, полный прогон `pre-commit` |
 | **Проверки Django** | `manage.py check`, `makemigrations --check` (забытые миграции), `check --deploy --fail-level WARNING` с включёнными HTTPS-флагами |
 | **Тесты** | матрица Python 3.12 и 3.13, реальный PostgreSQL 16 в сервис-контейнере, `pytest --cov --cov-fail-under=90`, отчёт о покрытии в артефактах |
-| **docker compose up** | поднимает стек как в проде, ждёт ответа приложения, проверяет 302 для анонима на `/manage/` и что роли засеяны, гасит стек |
-| **Публикация в GHCR** | только для `main` и тегов `v*`: собирает образ и пушит в `ghcr.io/<owner>/<repo>` с тегами `latest`, `sha-…`, semver. Использует встроенный `GITHUB_TOKEN`, секреты настраивать не нужно |
+| **docker compose up** | поднимает стек как в проде, проверяет 302 для анонима на `/manage/` и `/files/`, вход админом и что роли засеяны |
+| **E2E (Playwright)** | поднимает тот же стек, ставит chromium, гоняет сценарии файлового менеджера, при падении сохраняет отчёт Playwright артефактом |
+| **Публикация в GHCR** | ждёт зелёных smoke и E2E; только для `main` и тегов `v*`: собирает образ и пушит в `ghcr.io/<owner>/<repo>` с тегами `latest`, `sha-…`, semver. Использует встроенный `GITHUB_TOKEN`, секреты настраивать не нужно |
 
 CD доведён до публикации образа: дальше на своём сервере достаточно
 `docker compose pull && docker compose up -d` с этим образом. Обновление
@@ -331,6 +465,63 @@ docker compose logs -f web                                 # логи, вклю�
 entrypoint снова прогонит миграции и сид — на пустой базе получится чистый
 стенд, на существующей ничего не сломается: обе команды идемпотентны.
 
+## Деплой в AWS
+
+Разворачивается всё приложение целиком — `/manage/`, `/files/` и остальное, —
+а не файловый менеджер отдельно.
+
+### Что поднимается
+
+| Сервис | Зачем |
+| --- | --- |
+| S3 | хранилище файлового менеджера, приватный бакет с шифрованием и блокировкой публичного доступа |
+| EC2 (t3.micro, free tier) | инстанс с Docker; тянет образ из GHCR и поднимает его вместе с Postgres |
+| IAM-роль инстанса | доступ к бакету **только** на `ListBucket`, `GetObject`, `PutObject`, `DeleteObject` — без ключей в коде и без `AdministratorAccess` |
+| Security group | наружу открыт только 80-й порт; SSH — лишь если явно указать свой адрес |
+
+```
+браузер → EC2 (:80 → gunicorn:8000) ─┬→ Postgres в контейнере на том же инстансе
+                                     └→ S3 (файлы), доступ по IAM-роли, IMDSv2
+```
+
+### Шаги
+
+```bash
+cd deploy/aws
+terraform init
+terraform apply -var bucket_name=имя-бакета-глобально-уникальное
+# при необходимости: -var ssh_cidr=1.2.3.4/32 -var key_name=my-key
+```
+
+Terraform выведет `app_url` — по нему приложение и открывается. Первый старт
+занимает пару минут: инстанс ставит Docker и тянет образ. `SECRET_KEY` и пароль
+базы генерируются самим Terraform и попадают только в `.env` на инстансе.
+
+Приложение стартует с `FILE_STORAGE_BACKEND=s3`, поэтому загруженные файлы
+сразу уезжают в бакет. Проверить: загрузите файл в `/files/` и посмотрите
+`aws s3 ls s3://имя-бакета/filemanager/`.
+
+Если разворачиваете без Terraform, IAM-политика минимальных прав лежит в
+`deploy/aws/iam-policy.json` — подставьте туда имя бакета.
+
+### Как снести всё после проверки
+
+```bash
+cd deploy/aws
+terraform destroy
+```
+
+Одна команда убирает инстанс, бакет вместе с файлами (`force_destroy = true`),
+IAM-роль, политику и security group. Ручная проверка, что ничего не капает:
+
+- [ ] EC2 → Instances: инстанс `users-and-roles-app` в состоянии terminated;
+- [ ] S3 → бакета в списке нет;
+- [ ] IAM → Roles: роли `users-and-roles-app` нет;
+- [ ] EC2 → Security Groups: группы `users-and-roles-app` нет;
+- [ ] EC2 → Elastic IPs: нет висящих адресов (Terraform их не создаёт, но если
+      выдавали руками — освободите, они платные в простое);
+- [ ] Billing → Cost Explorer через сутки: по проекту ноль.
+
 ## Проверить, что пароли захешированы
 
 ```bash
@@ -358,6 +549,13 @@ panel/            кастомная админка на /manage/
   views.py          списки, форма ролей, создание юзера, аудит
   forms.py          формы поверх встроенных
   models.py         RoleChange (аудит-лог)
+files/            файловый менеджер на /files/
+  paths.py          нормализация путей, защита от traversal
+  storage.py        контракт хранилища + local и s3
+  access.py         кто пускается в раздел
+  views.py          список, загрузка, переименование, удаление, скачивание
+e2e/              Playwright: сценарии в браузере
+deploy/aws/       Terraform: S3, IAM-роль, EC2
 templates/        base.html, registration/login.html, панель, 403/404/500
 static/css/       единственный css-файл
 tests/            pytest-django

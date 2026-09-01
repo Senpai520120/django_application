@@ -11,6 +11,7 @@
   <a class="brand" href="{% url 'home' %}">Users &amp; Roles</a>
   <nav>
     {% if user.is_authenticated %}
+      <a href="{% url 'files:browse' %}">Файлы</a>
       {% if is_panel_admin %}
         <a href="{% url 'panel:user_list' %}">Пользователи</a>
         <a href="{% url 'panel:role_list' %}">Роли</a>
@@ -29,7 +30,7 @@
 
 <main>
   {% if messages %}
-    <ul class="messages">
+    <ul class="messages" role="status" aria-live="polite">
       {% for message in messages %}
         <li class="message {{ message.tags }}">{{ message }}</li>
       {% endfor %}
