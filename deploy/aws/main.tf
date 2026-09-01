@@ -109,9 +109,10 @@ resource "aws_iam_instance_profile" "app" {
 # Сеть и инстанс
 # ---------------------------------------------------------------------------
 
+# AWS принимает описание security group только в ASCII, поэтому оно на латинице.
 resource "aws_security_group" "app" {
   name        = "${local.name}-app"
-  description = "HTTP наружу, SSH только с указанного адреса"
+  description = "HTTP for everyone, SSH only from the configured address"
   tags        = local.tags
 
   ingress {
@@ -162,6 +163,10 @@ resource "aws_instance" "app" {
   metadata_options {
     http_tokens = "required" # IMDSv2
   }
+
+  # Смена образа меняет user_data, а cloud-init отрабатывает только на первой
+  # загрузке. Без этого инстанс перезапустился бы со старым контейнером.
+  user_data_replace_on_change = true
 
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
     image       = var.image

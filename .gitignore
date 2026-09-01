@@ -1,8 +1,14 @@
 __pycache__/
 *.py[cod]
 .venv/
+.tools/
 venv/
 .env
+
+# Ключи и сертификаты рядом с проектом не должны попасть в git.
+*.pem
+*.key
+*.ppk
 *.sqlite3
 staticfiles/
 filemanager/

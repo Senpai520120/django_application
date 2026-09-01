@@ -484,14 +484,31 @@ entrypoint снова прогонит миграции и сид — на пу�
                                      └→ S3 (файлы), доступ по IAM-роли, IMDSv2
 ```
 
+### Живой стенд
+
+Развёрнут и проверен: приложение работает, файлы уезжают в S3.
+
+| | |
+| --- | --- |
+| Адрес | http://100.54.108.163/ |
+| Учётка для просмотра | `demo_admin` / `demo-password-123` |
+| Регион | `us-east-1` |
+| Бакет | `users-and-roles-files-f92fa1c9` |
+| Образ | `ghcr.io/senpai520120/django_application:0.2.0` |
+
+Стенд временный и будет погашен после проверки — команда сноса ниже.
+
 ### Шаги
 
 ```bash
 cd deploy/aws
 terraform init
-terraform apply -var bucket_name=имя-бакета-глобально-уникальное
-# при необходимости: -var ssh_cidr=1.2.3.4/32 -var key_name=my-key
+terraform apply   -var region=us-east-1   -var bucket_name=имя-бакета-глобально-уникальное   -var key_name=имя-вашей-ключевой-пары   -var ssh_cidr=ваш.ip.адрес/32   -var image=ghcr.io/senpai520120/django_application:0.2.0
 ```
+
+Ключевая пара привязана к региону: разворачивайте туда же, где она создана.
+Файл `terraform.tfstate` содержит сгенерированные `SECRET_KEY` и пароль базы —
+он в `.gitignore`, коммитить и пересылать его нельзя.
 
 Terraform выведет `app_url` — по нему приложение и открывается. Первый старт
 занимает пару минут: инстанс ставит Docker и тянет образ. `SECRET_KEY` и пароль
@@ -508,7 +525,7 @@ Terraform выведет `app_url` — по нему приложение и о�
 
 ```bash
 cd deploy/aws
-terraform destroy
+terraform destroy   -var region=us-east-1   -var bucket_name=users-and-roles-files-f92fa1c9   -var key_name=test_django
 ```
 
 Одна команда убирает инстанс, бакет вместе с файлами (`force_destroy = true`),
