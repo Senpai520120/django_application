@@ -31,7 +31,7 @@ addopts = "-q"
 filterwarnings = ["ignore:No directory at:UserWarning"]
 
 [tool.coverage.run]
-source = ["accounts", "config", "panel"]
+source = ["accounts", "config", "files", "panel"]
 omit = ["*/migrations/*", "config/asgi.py", "config/wsgi.py"]
 
 [tool.coverage.report]

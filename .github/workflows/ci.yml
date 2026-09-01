@@ -210,7 +210,51 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
-      - name: Прогнать E2E
+      - name: Прогнать E2E (локальное хранилище)
+        working-directory: e2e
+        env:
+          BASE_URL: http://127.0.0.1:8000
+          E2E_MAX_FILE_SIZE: "5242880"
+        run: npx playwright test
+
+      # Тот же набор сценариев против S3-режима. Реального AWS не нужно:
+      # роль бакета играет localstack из профиля s3 в docker-compose.
+      - name: Перезапустить стек в S3-режиме
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          docker compose down -v
+          KEY=$(python -c "import secrets; print(secrets.token_urlsafe(64))")
+          cat > .env <<ENV
+          SECRET_KEY=$KEY
+          FILE_STORAGE_BACKEND=s3
+          FILE_MANAGER_S3_LOCATION=filemanager
+          AWS_STORAGE_BUCKET_NAME=e2e-bucket
+          AWS_S3_REGION_NAME=us-east-1
+          AWS_S3_ENDPOINT_URL=http://localstack:4566
+          AWS_S3_ADDRESSING_STYLE=path
+          AWS_ACCESS_KEY_ID=test
+          AWS_SECRET_ACCESS_KEY=test
+          ENV
+          FILE_STORAGE_BACKEND=s3 docker compose --profile s3 up -d --build
+
+          for _ in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:4566/_localstack/health > /dev/null; then break; fi
+            sleep 3
+          done
+          aws --endpoint-url=http://127.0.0.1:4566 s3 mb s3://e2e-bucket
+
+          for _ in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/login/ || true)
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 2
+          done
+          echo "приложение в S3-режиме не поднялось"
+          exit 1
+
+      - name: Прогнать E2E (S3 через localstack)
         working-directory: e2e
         env:
           BASE_URL: http://127.0.0.1:8000

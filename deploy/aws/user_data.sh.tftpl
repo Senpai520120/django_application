@@ -10,11 +10,16 @@ systemctl enable --now docker
 install -d -m 0750 /opt/app
 cd /opt/app
 
+# Публичный адрес заранее неизвестен, поэтому берём его из метаданных инстанса
+# (IMDSv2, токен обязателен) и подставляем в ALLOWED_HOSTS вместо звёздочки.
+IMDS_TOKEN=$(curl -sX PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
+
 # Секреты пишутся на инстансе, в репозитории их нет.
 cat > .env <<ENV
 SECRET_KEY=${secret_key}
 DEBUG=False
-ALLOWED_HOSTS=*
+ALLOWED_HOSTS=$PUBLIC_IP,localhost,127.0.0.1
 DATABASE_URL=postgres://users_roles:${db_password}@db:5432/users_roles
 FILE_STORAGE_BACKEND=s3
 AWS_STORAGE_BUCKET_NAME=${bucket}

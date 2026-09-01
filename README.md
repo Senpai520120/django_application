@@ -20,7 +20,7 @@
 | Роли | встроенные `auth.Group` |
 | Хранилище файлов | `FileSystemStorage` или S3 через django-storages, выбор переменной окружения |
 | Конфигурация | `django-environ`, всё из переменных окружения |
-| Тесты | pytest + pytest-django, 50 тестов, покрытие 97% |
+| Тесты | pytest + pytest-django, 156 тестов, покрытие 95% |
 | Линт | ruff + black, локально через pre-commit |
 | E2E | Playwright (chromium), сценарии файлового менеджера |
 | CI/CD | GitHub Actions: линтеры → проверки Django → тесты → smoke docker compose → публикация образа в GHCR |
@@ -289,7 +289,7 @@ docker compose --profile s3 up --build
 ```bash
 pytest                                  # 156 тестов
 pytest -v
-pytest --cov --cov-report=term-missing  # покрытие (сейчас 97%)
+pytest --cov --cov-report=term-missing  # покрытие (сейчас 95%)
 ```
 
 Тесты используют `config/settings_test.py`: свой `SECRET_KEY`, статика без
