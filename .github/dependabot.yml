@@ -1,5 +1,6 @@
 version: 2
 updates:
+  # Зависимости приложения и инструменты разработки.
   - package-ecosystem: pip
     directory: "/"
     schedule:
@@ -9,12 +10,44 @@ updates:
       python-deps:
         patterns: ["*"]
 
+  # Браузерные тесты. Playwright выпускается часто, и версия пакета должна
+  # совпадать с версией браузеров, которую ставит CI.
+  - package-ecosystem: npm
+    directory: "/e2e"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      e2e-deps:
+        patterns: ["*"]
+
+  # Без группировки каждый экшен приезжает отдельным PR — их набирается шесть.
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      github-actions:
+        patterns: ["*"]
 
+  # Базовый образ из Dockerfile.
   - package-ecosystem: docker
     directory: "/"
     schedule:
       interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      docker-images:
+        patterns: ["*"]
+
+  # Образы из docker-compose.yml (postgres, localstack) — это отдельная
+  # экосистема, ecosystem: docker их не видит.
+  - package-ecosystem: docker-compose
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      compose-images:
+        patterns: ["*"]
