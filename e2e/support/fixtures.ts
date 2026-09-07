@@ -1,6 +1,7 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
 import { FileManagerPage } from "./file-manager.page";
+import { PanelPage } from "./panel.page";
 
 /** Учётка берётся из окружения: в CI это demo-пользователь из seed_demo_users. */
 export const credentials = {
@@ -26,6 +27,8 @@ export async function login(page: Page): Promise<void> {
 type Fixtures = {
   /** Файловый менеджер под залогиненным пользователем. */
   fileManager: FileManagerPage;
+  /** Панель администратора под залогиненным админом. */
+  panel: PanelPage;
   /** Пустая папка под конкретный тест, которая убирается за собой. */
   workspace: string;
 };
@@ -36,6 +39,13 @@ export const test = base.extend<Fixtures>({
     const fileManager = new FileManagerPage(page);
     await fileManager.goto();
     await use(fileManager);
+  },
+
+  panel: async ({ page }, use) => {
+    await login(page);
+    const panel = new PanelPage(page);
+    await panel.goto();
+    await use(panel);
   },
 
   workspace: async ({ fileManager }, use, testInfo) => {
