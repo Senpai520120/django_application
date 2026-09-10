@@ -17,6 +17,30 @@ anonymous.describe("Доступ к разделу", () => {
 
     await expect(page).toHaveURL(/\/login\//);
   });
+
+  anonymous("неверные данные не пускают и не выдают, есть ли такой юзер", async ({
+    page,
+  }) => {
+    await page.goto("/login/");
+
+    await page.getByLabel("Имя пользователя").fill("demo_admin");
+    await page.getByLabel("Пароль").fill("совсем-не-тот-пароль");
+    await page.getByRole("button", { name: "Войти" }).click();
+
+    const wrongPassword = await page.getByRole("listitem").first().innerText();
+
+    await expect(page.getByRole("heading", { name: "Вход" })).toBeVisible();
+    expect(wrongPassword).toContain("Пожалуйста, введите правильные");
+
+    await page.getByLabel("Имя пользователя").fill("такого-юзера-нет");
+    await page.getByLabel("Пароль").fill("совсем-не-тот-пароль");
+    await page.getByRole("button", { name: "Войти" }).click();
+
+    const unknownUser = await page.getByRole("listitem").first().innerText();
+
+    // Тексты совпадают, значит по ответу нельзя понять, существует ли логин.
+    expect(unknownUser).toBe(wrongPassword);
+  });
 });
 
 test.describe("Вход и переход в раздел", () => {
