@@ -1,215 +1,216 @@
 # Users & Roles
 
-Пользователи логинятся встроенными вьюхами Django, а админ через собственную
-страницу `/manage/` (не через `/admin/`) смотрит список пользователей и ролей и
-назначает или снимает роли.
+Users sign in through Django's built-in views, and an admin manages the list of
+users and roles from a page of its own at `/manage/` — not through `/admin/` —
+granting and revoking roles there.
 
-Пользователь — стандартный `auth.User`, роль — стандартная `auth.Group`,
-логин, логаут, хеширование и сессии — из `django.contrib.auth`. Руками написаны
-панель, контроль доступа и шаблоны.
+A user is the stock `auth.User`, a role is the stock `auth.Group`, and login,
+logout, password hashing and sessions all come from `django.contrib.auth`.
+What is written by hand: the panel, the access control and the templates.
 
-## Стек
+## Stack
 
-| Что | Чем |
+| What | With |
 | --- | --- |
-| Язык | Python 3.11+ (собрано на 3.11, CI гоняет 3.12) |
-| Фреймворк | Django 5.2 LTS |
-| БД | PostgreSQL в docker/CI, SQLite по умолчанию для локалки |
-| Frontend | Django templates (SSR) + один файл CSS |
-| Аутентификация | `django.contrib.auth`, сессии, встроенные `LoginView` / `LogoutView` |
-| Роли | встроенные `auth.Group` |
-| Хранилище файлов | `FileSystemStorage` или S3 через django-storages, выбор переменной окружения |
-| Конфигурация | `django-environ`, всё из переменных окружения |
-| Тесты | pytest + pytest-django, 156 тестов, покрытие 95% |
-| Линт | ruff + black, локально через pre-commit |
-| E2E | Playwright (chromium), сценарии панели и файлового менеджера |
-| CI/CD | GitHub Actions: линтеры → проверки Django → тесты → smoke docker compose → публикация образа в GHCR |
+| Language | Python 3.11+ (developed on 3.11, CI runs 3.12 and 3.13) |
+| Framework | Django 5.2 LTS |
+| Database | PostgreSQL in docker and CI, SQLite by default locally |
+| Frontend | Django templates (SSR) plus a single CSS file |
+| Authentication | `django.contrib.auth`, sessions, built-in `LoginView` / `LogoutView` |
+| Roles | built-in `auth.Group` |
+| File storage | `FileSystemStorage` or S3 through django-storages, picked by an environment variable |
+| Configuration | `django-environ`, everything from the environment |
+| Tests | pytest + pytest-django, 157 tests, 95% coverage |
+| Lint | ruff + black, locally through pre-commit |
+| E2E | Playwright (chromium), panel and file manager scenarios |
+| CI/CD | GitHub Actions: linters → Django checks → tests → docker compose smoke → image published to GHCR |
 
-## Быстрый старт
+## Quick start
 
-Нужен только Python. БД по умолчанию — SQLite, ставить ничего не надо.
+Python is all you need. The default database is SQLite, so nothing else has to
+be installed.
 
 ```bash
-# 1. Виртуальное окружение
+# 1. Virtual environment
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
-# 2. Зависимости
-pip install -r requirements-dev.txt   # для прода достаточно requirements.txt
+# 2. Dependencies
+pip install -r requirements-dev.txt   # production only needs requirements.txt
 
-# 3. Настройки: скопировать пример и вписать SECRET_KEY
+# 3. Settings: copy the example and put in a SECRET_KEY
 cp .env.example .env                  # Windows: copy .env.example .env
-python -c "import secrets; print(secrets.token_urlsafe(64))"   # вставить в SECRET_KEY
+python -c "import secrets; print(secrets.token_urlsafe(64))"   # paste into SECRET_KEY
 
-# 4. База: миграции сразу создают роли admin и user (data-миграция)
+# 4. Database: migrations create the admin and user roles right away
 python manage.py migrate
 
-# 5. Свой аккаунт администратора
+# 5. Your own administrator account
 python manage.py createsuperuser
 
-# 6. Тестовые пользователи: админ, обычный, деактивированный и ещё десяток
+# 6. Demo users: an admin, a regular one, a deactivated one and a dozen more
 python manage.py seed_demo_users
 
-# 7. Хуки перед коммитом (ruff, black, проверки Django)
+# 7. Hooks that run before a commit (ruff, black, Django checks)
 pre-commit install
 
-# 8. Запуск
+# 8. Run it
 python manage.py runserver
 ```
 
-Проверить:
+Check:
 
-* http://127.0.0.1:8000/login/ — вход;
-* http://127.0.0.1:8000/ — «Вы вошли как X, ваши роли: …»;
-* http://127.0.0.1:8000/manage/ — панель (только для админов).
+* http://127.0.0.1:8000/login/ — sign in;
+* http://127.0.0.1:8000/ — "you are signed in as X, your roles are …";
+* http://127.0.0.1:8000/manage/ — the panel (admins only).
 
-Суперпользователь попадает в панель сразу. Чтобы сделать админом обычного
-пользователя, добавьте его в группу `admin` — из самой панели или командой:
+A superuser reaches the panel straight away. To make a regular user an admin,
+add them to the `admin` group, either from the panel itself or with:
 
 ```bash
 python manage.py shell -c "from django.contrib.auth.models import Group, User; User.objects.get(username='ivan').groups.add(Group.objects.get(name='admin'))"
 ```
 
-## Тестовые пользователи
+## Demo users
 
 ```bash
-python manage.py seed_demo_users              # создать/обновить
-python manage.py seed_demo_users --extra 0    # без «массовки» для пагинации
+python manage.py seed_demo_users              # create or update
+python manage.py seed_demo_users --extra 0    # without the crowd used for pagination
 python manage.py seed_demo_users --password 'My-Pass-1' --extra 5
-python manage.py seed_demo_users --delete     # удалить всех demo_*
+python manage.py seed_demo_users --delete     # remove every demo_*
 ```
 
-Команда идемпотентна: повторный запуск не плодит дубликаты, а возвращает
-аккаунты к описанному состоянию (пароль, роли, флаги). При `DEBUG=False` она
-отказывается работать без `--force` — чтобы аккаунты с общеизвестным паролем
-не уехали в прод.
+The command is idempotent: running it again creates no duplicates and instead
+returns the accounts to the described state (password, roles, flags). With
+`DEBUG=False` it refuses to run without `--force`, so accounts with a well-known
+password never reach production.
 
-| Логин | Роль | Зачем нужен |
+| Username | Role | What it is for |
 | --- | --- | --- |
-| `demo_admin` | группа `admin` | админ обычным способом, видит `/manage/` |
-| `demo_staff` | `is_staff` | проверить второй путь в панель, без группы |
-| `demo_user` | группа `user` | обычный юзер, на `/manage/` получает 403 |
-| `demo_inactive` | группа `user` | деактивирован, войти не сможет |
-| `demo_user01…10` | группа `user` | массовка для поиска и пагинации |
+| `demo_admin` | `admin` group | an admin the ordinary way, sees `/manage/` |
+| `demo_staff` | `is_staff` | the second route into the panel, with no group |
+| `demo_user` | `user` group | a regular user, gets 403 on `/manage/` |
+| `demo_inactive` | `user` group | deactivated, cannot sign in |
+| `demo_user01…10` | `user` group | a crowd for search and pagination |
 
-Пароль у всех — `demo-password-123` (меняется флагом `--password`).
+They all share the password `demo-password-123` (changed with `--password`).
 
-## Маршруты
+## Routes
 
-| URL | Что делает | Кто пускается |
+| URL | What it does | Who gets in |
 | --- | --- | --- |
-| `/login/` | вход, встроенная `LoginView` + свой шаблон | все |
-| `/logout/` | выход, встроенная `LogoutView` (только POST) | все |
-| `/` | домашняя страница: кто вы и какие у вас роли | залогиненные |
-| `/files/` | файловый менеджер: список папки, навигация | залогиненные |
-| `/files/folder/new/` | создание папки (POST) | залогиненные |
-| `/files/upload/` | загрузка файлов (POST) | залогиненные |
-| `/files/rename/` | переименование файла или папки | залогиненные |
-| `/files/delete/` | удаление с подтверждением | залогиненные |
-| `/files/download/` | скачивание файла вложением | залогиненные |
-| `/manage/` | список пользователей: поиск, пагинация, роли, активность | админы |
-| `/manage/roles/` | список ролей и число участников | админы |
-| `/manage/users/<pk>/roles/` | форма назначения/снятия ролей | админы |
-| `/manage/users/<pk>/toggle-active/` | включить/выключить пользователя (POST) | админы |
-| `/manage/users/new/` | создание пользователя (бонус) | админы |
-| `/manage/audit/` | кто кому какую роль менял и когда (бонус) | админы |
-| `/admin/` | стандартная админка Django, оставлена как референс | `is_staff` |
+| `/login/` | sign in, the built-in `LoginView` with our template | everyone |
+| `/logout/` | sign out, the built-in `LogoutView` (POST only) | everyone |
+| `/` | home page: who you are and which roles you hold | signed in |
+| `/files/` | file manager: folder listing and navigation | signed in |
+| `/files/folder/new/` | create a folder (POST) | signed in |
+| `/files/upload/` | upload files (POST) | signed in |
+| `/files/rename/` | rename a file or a folder | signed in |
+| `/files/delete/` | delete with confirmation | signed in |
+| `/files/download/` | download a file as an attachment | signed in |
+| `/manage/` | user list: search, pagination, roles, activity | admins |
+| `/manage/roles/` | roles and their member counts | admins |
+| `/manage/users/<pk>/roles/` | form for granting and revoking roles | admins |
+| `/manage/users/<pk>/toggle-active/` | switch a user on or off (POST) | admins |
+| `/manage/users/new/` | create a user (bonus) | admins |
+| `/manage/audit/` | who changed whose role, and when (bonus) | admins |
+| `/admin/` | Django's stock admin, kept for reference | `is_staff` |
 
-Аноним на `/manage/` получает редирект на `/login/?next=…`, залогиненный
-не-админ — **403**.
+An anonymous visitor on `/manage/` is redirected to `/login/?next=…`; a signed-in
+non-admin gets **403**.
 
-## Переменные окружения
+## Environment variables
 
-Читаются из `.env` в корне проекта (см. `.env.example`). Реальные переменные
-окружения имеют приоритет над файлом, поэтому в CI и docker `.env` не обязателен.
+They are read from `.env` in the project root (see `.env.example`). Real
+environment variables win over the file, so CI and docker need no `.env` at all.
 
-| Переменная | По умолчанию | Зачем |
+| Variable | Default | What for |
 | --- | --- | --- |
-| `SECRET_KEY` | — (обязательна) | ключ Django; без неё проект не стартует |
-| `DEBUG` | `False` | режим отладки |
-| `ALLOWED_HOSTS` | `localhost,127.0.0.1,[::1]` | список через запятую |
-| `DATABASE_URL` | `sqlite:///<корень>/db.sqlite3` | например `postgres://user:pass@host:5432/db` |
-| `TIME_ZONE` | `UTC` | часовой пояс |
-| `STATICFILES_BACKEND` | манифест whitenoise при `DEBUG=False` | чем раздавать статику |
-| `SESSION_COOKIE_SECURE` | `False` | включать только на HTTPS |
-| `CSRF_COOKIE_SECURE` | `False` | включать только на HTTPS |
-| `SECURE_SSL_REDIRECT` | `False` | редирект на HTTPS |
+| `SECRET_KEY` | — (required) | Django key; without it the project refuses to start |
+| `DEBUG` | `False` | debug mode |
+| `ALLOWED_HOSTS` | `localhost,127.0.0.1,[::1]` | comma-separated list |
+| `DATABASE_URL` | `sqlite:///<root>/db.sqlite3` | for example `postgres://user:pass@host:5432/db` |
+| `TIME_ZONE` | `UTC` | time zone |
+| `STATICFILES_BACKEND` | whitenoise manifest when `DEBUG=False` | how static files are served |
+| `SESSION_COOKIE_SECURE` | `False` | turn on over HTTPS only |
+| `CSRF_COOKIE_SECURE` | `False` | turn on over HTTPS only |
+| `SECURE_SSL_REDIRECT` | `False` | redirect to HTTPS |
 | `SECURE_HSTS_SECONDS` | `0` | HSTS |
-| `SECURE_HSTS_INCLUDE_SUBDOMAINS` | `False` | HSTS для поддоменов |
+| `SECURE_HSTS_INCLUDE_SUBDOMAINS` | `False` | HSTS for subdomains |
 | `SECURE_HSTS_PRELOAD` | `False` | HSTS preload |
-| `USE_X_FORWARDED_PROTO` | `False` | доверять `X-Forwarded-Proto` от прокси |
-| `LOG_LEVEL` | `INFO` | уровень логов в stdout |
-| `FILE_STORAGE_BACKEND` | `local` | `local` — диск сервера, `s3` — бакет AWS |
-| `FILE_MANAGER_ROOT` | `<корень>/filemanager` | папка хранилища при `local` |
-| `FILE_MANAGER_MAX_FILE_SIZE` | `26214400` | лимит на один файл, байты |
-| `FILE_MANAGER_MAX_TOTAL_SIZE` | `536870912` | лимит на всё хранилище, байты |
-| `FILE_MANAGER_S3_LOCATION` | `filemanager` | префикс ключей в бакете |
-| `AWS_STORAGE_BUCKET_NAME` | пусто | бакет, обязателен при `s3` |
-| `AWS_S3_REGION_NAME` | `eu-central-1` | регион бакета |
-| `AWS_S3_ENDPOINT_URL` | пусто | адрес S3-эмулятора для локальной проверки |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | пусто | не задаются на EC2: работает IAM-роль |
-| `CSRF_TRUSTED_ORIGINS` | пусто | нужно за HTTPS-прокси |
+| `USE_X_FORWARDED_PROTO` | `False` | trust `X-Forwarded-Proto` from the proxy |
+| `LOG_LEVEL` | `INFO` | log level on stdout |
+| `FILE_STORAGE_BACKEND` | `local` | `local` is the server disk, `s3` is an AWS bucket |
+| `FILE_MANAGER_ROOT` | `<root>/filemanager` | storage folder when `local` |
+| `FILE_MANAGER_MAX_FILE_SIZE` | `26214400` | per-file limit, in bytes |
+| `FILE_MANAGER_MAX_TOTAL_SIZE` | `536870912` | whole-storage limit, in bytes |
+| `FILE_MANAGER_S3_LOCATION` | `filemanager` | key prefix inside the bucket |
+| `AWS_STORAGE_BUCKET_NAME` | empty | bucket, required with `s3` |
+| `AWS_S3_REGION_NAME` | `eu-central-1` | bucket region |
+| `AWS_S3_ENDPOINT_URL` | empty | S3 emulator address for local checks |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | empty | left unset on EC2, where the IAM role works |
+| `CSRF_TRUSTED_ORIGINS` | empty | needed behind an HTTPS proxy |
 
-`*_SECURE`-флаги выключены по умолчанию: на локальном HTTP браузер не сохранит
-secure-cookie и логин перестанет работать. Перед выкладкой на HTTPS включите их
-и проверьте `python manage.py check --deploy`.
+The `*_SECURE` flags are off by default: over plain local HTTP the browser drops
+a secure cookie and login stops working. Turn them on before going to HTTPS and
+check with `python manage.py check --deploy`.
 
-## Что взято из коробки, а что написано руками
+## What comes from the box, and what is written by hand
 
-Из коробки (не переписывалось):
+Out of the box (never rewritten):
 
-| Возможность | Откуда |
+| Capability | From |
 | --- | --- |
-| Модель пользователя | `django.contrib.auth.models.User` |
-| Роли | `django.contrib.auth.models.Group` |
-| Хеширование паролей | `PBKDF2-SHA256`, `set_password` / `check_password` |
-| Валидация паролей | `AUTH_PASSWORD_VALIDATORS` |
-| Логин и логаут | `auth.views.LoginView`, `auth.views.LogoutView` |
-| Форма логина и её сообщения об ошибках | `AuthenticationForm` |
-| Сессии | `django.contrib.sessions` |
-| CSRF | `CsrfViewMiddleware` + `{% csrf_token %}` |
-| Каркас контроля доступа | `LoginRequiredMixin`, `UserPassesTestMixin` |
-| Списки, формы, пагинация | `ListView`, `UpdateView`, `CreateView`, `Paginator` |
-| Создание пользователя админом | `UserCreationForm` (мы только добавили поля) |
-| Миграции, ORM, management-команды | Django |
+| User model | `django.contrib.auth.models.User` |
+| Roles | `django.contrib.auth.models.Group` |
+| Password hashing | `PBKDF2-SHA256`, `set_password` / `check_password` |
+| Password validation | `AUTH_PASSWORD_VALIDATORS` |
+| Login and logout | `auth.views.LoginView`, `auth.views.LogoutView` |
+| Login form and its error messages | `AuthenticationForm` |
+| Sessions | `django.contrib.sessions` |
+| CSRF | `CsrfViewMiddleware` plus `{% csrf_token %}` |
+| Access-control scaffolding | `LoginRequiredMixin`, `UserPassesTestMixin` |
+| Lists, forms, pagination | `ListView`, `UpdateView`, `CreateView`, `Paginator` |
+| Creating a user as an admin | `UserCreationForm` (we only added fields) |
+| Migrations, ORM, management commands | Django |
 
-Написано руками:
+Written by hand:
 
-| Файл | Что там |
+| File | What is in it |
 | --- | --- |
-| `accounts/permissions.py` | `is_admin()` — единственное определение «кто админ» |
-| `accounts/mixins.py` | `AdminRequiredMixin` — контроль доступа для всех вьюх панели |
-| `accounts/context_processors.py` | флаг `is_panel_admin` для шаблонов |
-| `accounts/views.py` | домашняя страница пользователя |
-| `accounts/urls.py` | подключение встроенных `LoginView` / `LogoutView` |
-| `accounts/migrations/0001_seed_groups.py` | data-миграция: роли `admin` и `user` |
-| `accounts/management/commands/seed_groups.py` | идемпотентный сид ролей |
-| `accounts/management/commands/seed_demo_users.py` | тестовые пользователи для локальной проверки |
-| `docker/entrypoint.sh` | стартовая последовательность контейнера |
-| `panel/views.py` | вьюхи панели `/manage/` |
-| `panel/forms.py` | форма ролей и форма создания пользователя |
-| `panel/models.py` | `RoleChange` — аудит изменений ролей (бонус) |
-| `files/paths.py` | нормализация путей и имён, защита от path traversal |
-| `files/storage.py` | контракт хранилища и две реализации: диск и S3 |
-| `files/access.py` | правило доступа к разделу файлов |
-| `files/views.py` | список, загрузка, переименование, удаление, скачивание |
-| `e2e/` | Playwright: сценарии панели и файлового менеджера в браузере |
-| `deploy/aws/` | Terraform: бакет, IAM-роль, инстанс |
-| `templates/` | все шаблоны, включая `registration/login.html`, 403/404/500 |
-| `config/settings.py` | настройки на `django-environ` |
-| `config/settings_test.py` | настройки для тестов |
-| `.pre-commit-config.yaml` | хуки линтеров перед коммитом |
-| `.github/workflows/ci.yml` | пайплайн CI/CD |
+| `accounts/permissions.py` | `is_admin()` — the single definition of "who is an admin" |
+| `accounts/mixins.py` | `AdminRequiredMixin` — access control for every panel view |
+| `accounts/context_processors.py` | the `is_panel_admin` flag for templates |
+| `accounts/views.py` | the user's home page |
+| `accounts/urls.py` | wiring up the built-in `LoginView` / `LogoutView` |
+| `accounts/migrations/0001_seed_groups.py` | data migration: the `admin` and `user` roles |
+| `accounts/management/commands/seed_groups.py` | idempotent role seeding |
+| `accounts/management/commands/seed_demo_users.py` | demo users for local checks |
+| `docker/entrypoint.sh` | the container start-up sequence |
+| `panel/views.py` | views of the `/manage/` panel |
+| `panel/forms.py` | the roles form and the user creation form |
+| `panel/models.py` | `RoleChange` — the audit log of role changes (bonus) |
+| `files/paths.py` | path and name normalisation, protection from traversal |
+| `files/storage.py` | the storage contract and two implementations: disk and S3 |
+| `files/access.py` | the access rule for the files section |
+| `files/views.py` | listing, upload, rename, delete, download |
+| `e2e/` | Playwright: panel and file manager scenarios in a browser |
+| `deploy/aws/` | Terraform: bucket, IAM role, instance |
+| `templates/` | every template, including `registration/login.html` and 403/404/500 |
+| `config/settings.py` | settings on top of `django-environ` |
+| `config/settings_test.py` | settings for the test suite |
+| `.pre-commit-config.yaml` | linter hooks before a commit |
+| `.github/workflows/ci.yml` | the CI/CD pipeline |
 
-## Роли и контроль доступа
+## Roles and access control
 
-Роль — это группа. Сид создаёт две: `admin` и `user`.
+A role is a group. Seeding creates two of them: `admin` and `user`.
 
-Админом считается тот, кто удовлетворяет `accounts.permissions.is_admin`:
-состоит в группе `admin`, **или** имеет `is_staff`, **или** суперпользователь.
-Это единственное место, где живёт правило; вьюхи, шаблоны и тесты используют его.
+An admin is whoever satisfies `accounts.permissions.is_admin`: a member of the
+`admin` group, **or** someone with `is_staff`, **or** a superuser. That is the
+only place the rule lives; views, templates and tests all go through it.
 
-Все вьюхи панели наследуются от `AdminRequiredMixin`, копипаста проверок нет:
+Every panel view inherits from `AdminRequiredMixin`, so no check is copy-pasted:
 
 ```python
 class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -217,336 +218,369 @@ class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
         return is_admin(self.request.user)
 ```
 
-Поведение (даётся штатным `AccessMixin`): аноним — редирект на логин с `?next=`,
-залогиненный не-админ — `PermissionDenied`, то есть 403. Права проверяются на
-каждый запрос, поэтому снятая роль закрывает панель немедленно, без релогина.
+The behaviour comes from the stock `AccessMixin`: an anonymous visitor is
+redirected to login with `?next=`, a signed-in non-admin gets `PermissionDenied`,
+that is 403. Permissions are checked on every request, so a revoked role closes
+the panel immediately, without signing out and back in.
 
-## Файловый менеджер
+## File manager
 
-Раздел `/files/`: дерево папок и файлов, создание папок, загрузка нескольких
-файлов за раз, переименование, скачивание и удаление с подтверждением.
-Хранилище переключается переменной окружения — вьюхи об этом не знают.
+The `/files/` section: a tree of folders and files, folder creation, uploading
+several files at once, renaming, downloading and deleting with confirmation.
+The storage is switched by an environment variable, and the views know nothing
+about it.
 
-**Кому доступен.** Всем залогиненным пользователям: это общий раздел команды, а
-не часть админ-панели, поэтому он живёт рядом с `/manage/`, а не внутри неё.
-Правило вынесено в `files/access.py` — чтобы отдать файлы только админам,
-достаточно поменять там базовый класс на `AdminRequiredMixin`.
+**Who may open it.** Every signed-in user: this is a section shared by the whole
+team rather than a part of the admin panel, which is why it lives next to
+`/manage/` rather than inside it. The rule is isolated in `files/access.py` — to
+hand the files to admins only, swap the base class there for
+`AdminRequiredMixin`.
 
-### Как устроено хранилище
+### How the storage is built
 
 ```
 files/storage.py
-├── FileManagerStorage   контракт: list_dir, make_dir, save, open, delete,
+├── FileManagerStorage   contract: list_dir, make_dir, save, open, delete,
 │                        rename, exists, is_dir, size, total_size
-├── LocalFileStorage     поверх FileSystemStorage
-└── S3FileStorage        поверх S3Storage из django-storages
+├── LocalFileStorage     on top of FileSystemStorage
+└── S3FileStorage        on top of S3Storage from django-storages
 ```
 
-Backend выбирает `get_storage()` по `FILE_STORAGE_BACKEND`, он же задаёт
-`STORAGES["default"]` в настройках — тем же способом, каким `DATABASE_URL`
-выбирает базу. Третий backend добавляется новым подклассом: вьюхи и шаблоны
-не меняются.
+The backend is chosen by `get_storage()` from `FILE_STORAGE_BACKEND`, which also
+sets `STORAGES["default"]` in the settings — the same way `DATABASE_URL` picks a
+database. A third backend is added as a new subclass: views and templates stay
+as they are.
 
-Папки в S3 виртуальные: пустая папка — это объект нулевого размера с ключом,
-оканчивающимся на `/`. Удаление папки удаляет все ключи с её префиксом,
-переименование копирует их на новый префикс и удаляет старые.
+Folders in S3 are virtual: an empty folder is a zero-length object whose key
+ends with `/`. Deleting a folder removes every key under its prefix; renaming
+copies them onto the new prefix and deletes the old ones.
 
-### Режим S3
+### S3 mode
 
 ```bash
-# в .env
+# in .env
 FILE_STORAGE_BACKEND=s3
-AWS_STORAGE_BUCKET_NAME=имя-бакета
+AWS_STORAGE_BUCKET_NAME=your-bucket-name
 AWS_S3_REGION_NAME=eu-central-1
 ```
 
-Ключи задавать не нужно, если приложение работает на EC2 с IAM-ролью — boto3
-возьмёт временные креды из метаданных инстанса. Локально проверить S3-режим без
-облака можно на localstack:
+The keys can be left out when the app runs on EC2 with an IAM role: boto3 picks
+up temporary credentials from the instance metadata. To exercise S3 mode locally
+without a cloud, use localstack:
 
 ```bash
 docker compose --profile s3 up --build
-# в .env дополнительно: AWS_S3_ENDPOINT_URL=http://localstack:4566
+# additionally in .env: AWS_S3_ENDPOINT_URL=http://localstack:4566
 ```
 
-### Безопасность
+### Security
 
-| Что | Как закрыто |
+| What | How it is closed |
 | --- | --- |
-| Path traversal | `files/paths.py`: `..`, абсолютные пути, диски и null-байты отбиваются до обращения к хранилищу, ответ — 400 |
-| Симлинк наружу | локальное хранилище дополнительно сверяет уже разрешённый путь с корнем |
-| Имена файлов | запрещены разделители, управляющие символы, зарезервированные windows-имена, длина ограничена 120 символами |
-| Размер | лимит на файл и на суммарный объём хранилища, оба из переменных окружения |
-| Опасные расширения | скачивание всегда идёт с `Content-Disposition: attachment`, плюс `X-Content-Type-Options: nosniff` — браузер не выполнит `.html` или `.svg` |
-| Перезапись | файл с существующим именем не перезаписывается молча, а даёт ошибку |
-| Секреты | ключи AWS только в `.env` и в IAM-роли, в репозитории их нет |
+| Path traversal | `files/paths.py`: `..`, absolute paths, drive letters and null bytes are rejected before the storage is touched, and the answer is 400 |
+| Symlink leading out | the local storage additionally compares the already resolved path with the root |
+| File names | separators, control characters and names reserved by Windows are forbidden, and length is capped at 120 characters |
+| Size | a per-file limit and a total-storage limit, both from the environment |
+| Dangerous extensions | a download always carries `Content-Disposition: attachment` plus `X-Content-Type-Options: nosniff`, so the browser never executes an `.html` or an `.svg` |
+| Overwriting | a file with an existing name is not silently overwritten but answered with an error |
+| Secrets | AWS keys live only in `.env` and in the IAM role; the repository holds none |
 
-Все пункты закрыты тестами: `tests/test_files_paths.py`,
+Every line above is covered by tests: `tests/test_files_paths.py`,
 `tests/test_files_storage.py`, `tests/test_files_views.py`.
 
-## Тесты
+## Tests
 
 ```bash
-pytest                                  # 156 тестов
+pytest                                  # 157 tests
 pytest -v
-pytest --cov --cov-report=term-missing  # покрытие (сейчас 95%)
+pytest --cov --cov-report=term-missing  # coverage (95% right now)
 ```
 
-Тесты используют `config/settings_test.py`: свой `SECRET_KEY`, статика без
-манифеста и быстрый хешер паролей. Поэтому `pytest` работает на свежем клоне,
-без `.env` и без `collectstatic`. Боевой хешер проверяется отдельным тестом,
-который включает `PBKDF2PasswordHasher` явно.
+The suite uses `config/settings_test.py`: its own `SECRET_KEY`, static files
+without a manifest, and a fast password hasher. That is why `pytest` works on a
+fresh clone with no `.env` and no `collectstatic`. The production hasher is
+verified by a separate test that switches `PBKDF2PasswordHasher` on explicitly.
 
-Покрыто:
+What is covered:
 
-* `tests/test_auth.py` — вход успешный и неуспешный, отсутствие утечки
-  «существует ли такой юзер», неактивный пользователь, логаут, редирект
-  неавторизованного, **пароль в `auth_user` лежит хешем** (читается прямым SQL);
-* `tests/test_access_control.py` — аноним → редирект, обычный юзер → 403,
-  группа `admin` / `is_staff` / суперюзер → 200, снятие роли закрывает доступ;
-* `tests/test_roles.py` — назначение и снятие роли меняют БД, пишется аудит,
-  чужому доступ закрыт, POST без CSRF-токена отбивается;
-* `tests/test_panel.py` — поиск, пагинация, активация/деактивация, создание
-  пользователя, страница аудита;
-* `tests/test_seed_groups.py` — роли появляются после `migrate`, команда
-  `seed_groups` идемпотентна;
-* `tests/test_seed_demo_users.py` — тестовые юзеры создаются с нужными ролями и
-  флагами, команда идемпотентна, `--delete` не трогает чужие аккаунты, при
-  `DEBUG=False` без `--force` команда отказывается работать;
-* `tests/test_files_paths.py` — path traversal во всех видах, санитизация имён;
-* `tests/test_files_storage.py` — **контракт хранилища, прогнанный дважды**: для
-  локального диска и для S3 через `moto`. Один и тот же набор проверок, разные
-  реализации;
-* `tests/test_files_views.py` — доступ анонима, лимиты размера, вложение при
-  скачивании, рекурсивное удаление, 400 на путь наружу.
+* `tests/test_auth.py` — successful and failed sign-in, no leak of "does this
+  user exist", an inactive user, logout, the redirect for an unauthenticated
+  visitor, and **the password stored in `auth_user` as a hash** (read with raw
+  SQL);
+* `tests/test_access_control.py` — anonymous → redirect, regular user → 403,
+  `admin` group / `is_staff` / superuser → 200, revoking a role closes access;
+* `tests/test_roles.py` — granting and revoking a role changes the database and
+  writes an audit record, a stranger is refused, a POST without a CSRF token is
+  rejected;
+* `tests/test_panel.py` — search, pagination, activation and deactivation, user
+  creation, the audit page;
+* `tests/test_seed_groups.py` — roles appear after `migrate`, and the
+  `seed_groups` command is idempotent;
+* `tests/test_seed_demo_users.py` — demo users are created with the right roles
+  and flags, the command is idempotent, `--delete` leaves other accounts alone,
+  and with `DEBUG=False` it refuses to run without `--force`;
+* `tests/test_files_paths.py` — path traversal in every shape, name sanitisation;
+* `tests/test_files_storage.py` — **the storage contract, run twice**: against
+  the local disk and against S3 through `moto`. The same set of checks, two
+  different implementations;
+* `tests/test_files_views.py` — anonymous access, size limits, the attachment
+  header on download, recursive deletion, and 400 on a path leading outside.
 
-Тестовое окружение задаётся в корневом `conftest.py` (там же `SECRET_KEY` для CI),
-фикстуры пользователей — в `tests/conftest.py`.
+The test environment lives in `config/settings_test.py`; the user fixtures are in
+`tests/conftest.py`.
 
-## E2E-тесты (Playwright)
+## E2E tests (Playwright)
 
-Pytest проверяет бэкенд и вьюхи, Playwright — что сценарий работает в реальном
-браузере. Одно другое не заменяет.
+Pytest checks the backend and the views; Playwright checks that the scenario
+works in a real browser. Neither replaces the other.
 
 ```bash
 cd e2e
 npm ci
 npx playwright install chromium
-BASE_URL=http://127.0.0.1:8000 npx playwright test      # против поднятого стека
-npx playwright show-report                              # отчёт после прогона
+BASE_URL=http://127.0.0.1:8000 npx playwright test      # against a running stack
+npx playwright show-report                              # the report afterwards
 ```
 
-Приложение для тестов поднимается тем же `docker compose`, что и обычно.
-Пользователь берётся из `seed_demo_users` — `demo_admin` с паролем из README,
-переопределяется через `E2E_USERNAME` / `E2E_PASSWORD`.
+The app under test is started by the same `docker compose` as usual. The account
+comes from `seed_demo_users` — `demo_admin` with the password above, overridable
+through `E2E_USERNAME` / `E2E_PASSWORD`.
+
+Run Playwright **from the `e2e/` directory**. There is no config in the
+repository root, so from there the runner and the specs end up with two
+different instances of `@playwright/test` and every file fails with "did not
+expect test.describe() to be called here". Use `--config e2e/playwright.config.ts`
+if you have to launch it from elsewhere.
 
 ```
 e2e/
-├── playwright.config.ts   baseURL из окружения, retries только в CI,
-│                          trace on-first-retry, видео и скриншот при падении
+├── playwright.config.ts   baseURL from the environment, retries in CI only,
+│                          trace on-first-retry, video and screenshot on failure
 ├── support/
-│   ├── fixtures.ts        логин, уникальные имена, фикстуры panel и workspace
-│   ├── panel.page.ts      Page Object панели администратора
-│   └── file-manager.page.ts   Page Object файлового раздела
-├── auth.spec.ts           доступ анонима, вход, переход в раздел,
-│                          одинаковый ответ на неверный пароль и чужой логин
-├── panel.spec.ts          выдача и снятие роли, отмена формы, запрет снять
-│                          admin с себя, деактивация, запись в аудит, счётчик
-│                          на «Ролях», создание пользователя, слабый пароль
-├── folders.spec.ts        создание, вложенность, крошки, дубликат, удаление
-└── files.spec.ts          загрузка (одного и нескольких), переименование,
-                           скачивание, удаление, файл больше лимита
+│   ├── fixtures.ts        login, unique names, the panel and workspace fixtures
+│   ├── panel.page.ts      Page Object of the admin panel
+│   └── file-manager.page.ts   Page Object of the files section
+├── auth.spec.ts           anonymous access, sign-in, moving into the section,
+│                          the identical answer to a wrong password and an
+│                          unknown login
+├── panel.spec.ts          granting and revoking a role, cancelling the form,
+│                          the ban on stripping admin from yourself,
+│                          deactivation, the audit record, the counter on the
+│                          Roles page, creating a user, a weak password
+├── folders.spec.ts        creation, nesting, breadcrumbs, duplicates, deletion
+└── files.spec.ts          upload (one and several), rename, download, delete,
+                           a file over the limit
 ```
 
-Каждый файловый тест работает в своей папке с уникальным именем и убирает её за
-собой; тесты панели возвращают демо-пользователю исходный набор ролей в
-`afterEach`, а новых заводят под уникальным именем. Прогоны не зависят друг от
-друга и от порядка. Ожиданий по таймеру нет: только web-first assertions,
-которые сами дожидаются нужного состояния.
+Every file test works in a folder of its own with a unique name and cleans it up
+afterwards; the panel tests return the demo user to the original set of roles in
+`afterEach` and create new users under unique names. Runs depend neither on each
+other nor on order. There are no timer-based waits: only web-first assertions,
+which wait for the state they need on their own.
 
-**Про codegen.** Черновики сценариев снимались через `npx playwright codegen`,
-дальше приводились в порядок руками: локаторы заменены на `getByRole`,
-`getByLabel` и `getByTestId`, повторяющиеся шаги вынесены в Page Object и
-фикстуры, шаги подписаны через `test.step()`. Для устойчивых локаторов в
-шаблоны точечно добавлены `aria-label`, `role="status"` и `data-testid` — это
-честнее, чем цепляться за классы вёрстки.
+**About codegen.** Scenario drafts were recorded with `npx playwright codegen`
+and then put in order by hand: locators were replaced with `getByRole`,
+`getByLabel` and `getByTestId`, repeated steps were moved into Page Objects and
+fixtures, and the steps were labelled with `test.step()`. For stable locators a
+few `aria-label`, `role="status"` and `data-testid` attributes were added to the
+templates on purpose — that is more honest than clinging to markup classes.
 
-## Линт и форматирование
+The whole project speaks English: interface, comments, test names and docs.
+`LANGUAGE_CODE` is `en-us`, so Django's own messages — login errors, password
+validators — come out in English too, and the tests assert those exact texts.
+Two non-ASCII cases are kept on purpose: one upload scenario uses a Cyrillic
+file name, and `tests/test_files_paths.py` keeps Cyrillic fixtures, so that
+path handling is still proven against non-ASCII input.
+
+## Lint and formatting
 
 ```bash
-ruff check .            # проверить
-ruff check --fix .      # починить автоматом
-black .                 # отформатировать
-black --check .         # только проверить, как в CI
+ruff check .            # check
+ruff check --fix .      # fix automatically
+black .                 # format
+black --check .         # check only, the way CI does
 ```
 
-Локально всё это удобнее гонять через pre-commit — он же стоит хуком на коммит:
+Locally it is easier to run all of this through pre-commit, which is also
+installed as a commit hook:
 
 ```bash
-pre-commit install          # один раз после клонирования
-pre-commit run --all-files  # прогнать по всему репозиторию
-pre-commit autoupdate       # обновить версии хуков
+pre-commit install          # once after cloning
+pre-commit run --all-files  # run across the whole repository
+pre-commit autoupdate       # update hook versions
 ```
 
-Хуки: базовая гигиена файлов (конец строки, пробелы, крупные файлы, приватные
-ключи, валидность YAML/TOML), `ruff --fix`, `black`, плюс два локальных —
-`manage.py check` и `makemigrations --check` (ловит забытые миграции).
-Локальные хуки зовут `python` из PATH, поэтому коммитить нужно с активированным
-venv.
+The hooks: basic file hygiene (end of file, whitespace, large files, private
+keys, valid YAML and TOML), `ruff --fix`, `black`, plus two local ones —
+`manage.py check` and `makemigrations --check`, which catches forgotten
+migrations. The local hooks call `python` from PATH, so commit with the venv
+activated.
 
 ## CI/CD
 
-`.github/workflows/ci.yml` — на каждый push в `main`, на каждый pull request и
-по кнопке (`workflow_dispatch`). Пять job-ов:
+`.github/workflows/ci.yml` runs on every push to `main`, on every pull request
+and from the button (`workflow_dispatch`). Six jobs:
 
-| Job | Что делает |
+| Job | What it does |
 | --- | --- |
-| **Линтеры** | `ruff check`, `black --check`, полный прогон `pre-commit` |
-| **Проверки Django** | `manage.py check`, `makemigrations --check` (забытые миграции), `check --deploy --fail-level WARNING` с включёнными HTTPS-флагами |
-| **Тесты** | матрица Python 3.12 и 3.13, реальный PostgreSQL 16 в сервис-контейнере, `pytest --cov --cov-fail-under=90`, отчёт о покрытии в артефактах |
-| **docker compose up** | поднимает стек как в проде, проверяет 302 для анонима на `/manage/` и `/files/`, вход админом и что роли засеяны |
-| **E2E (Playwright)** | поднимает тот же стек, ставит chromium, гоняет сценарии панели и файлового менеджера, при падении сохраняет отчёт Playwright артефактом |
-| **Публикация в GHCR** | ждёт зелёных smoke и E2E; только для `main` и тегов `v*`: собирает образ и пушит в `ghcr.io/<owner>/<repo>` с тегами `latest`, `sha-…`, semver. Использует встроенный `GITHUB_TOKEN`, секреты настраивать не нужно |
+| **Linters** | `ruff check`, `black --check`, a full `pre-commit` run |
+| **Django checks** | `manage.py check`, `makemigrations --check` (forgotten migrations), `check --deploy --fail-level WARNING` with the HTTPS flags on |
+| **Tests** | a matrix of Python 3.12 and 3.13, a real PostgreSQL 16 service container, `pytest --cov --cov-fail-under=90`, coverage report in the artifacts |
+| **docker compose up** | starts the stack the way production does and checks the 302 for anonymous visitors on `/manage/` and `/files/`, an admin sign-in, and that the roles are seeded |
+| **E2E (Playwright)** | starts the same stack, installs chromium, runs the panel and file manager scenarios, and on failure keeps the Playwright report as an artifact |
+| **Publish to GHCR** | waits for a green smoke and E2E; for `main` and `v*` tags only: builds the image and pushes it to `ghcr.io/<owner>/<repo>` with the `latest`, `sha-…` and semver tags. Uses the built-in `GITHUB_TOKEN`, so no secrets to configure |
 
-CD доведён до публикации образа: дальше на своём сервере достаточно
-`docker compose pull && docker compose up -d` с этим образом. Обновление
-зависимостей — `.github/dependabot.yml` (pip, GitHub Actions, Docker, раз в неделю).
+CD goes as far as publishing the image: after that, `docker compose pull &&
+docker compose up -d` with that image is enough on your own server. Dependency
+updates come from `.github/dependabot.yml` (pip, npm, GitHub Actions, Docker and
+docker-compose, weekly).
 
-## PostgreSQL вместо SQLite
+## PostgreSQL instead of SQLite
 
-Достаточно поменять одну переменную в `.env`:
+One variable in `.env` is enough:
 
 ```
 DATABASE_URL=postgres://users_roles:users_roles@localhost:5432/users_roles
 ```
 
-Драйвер `psycopg[binary]` уже в `requirements.txt`, дальше обычный
-`python manage.py migrate`.
+The `psycopg[binary]` driver is already in `requirements.txt`; after that it is
+the usual `python manage.py migrate`.
 
 ## Docker
 
 ```bash
-cp .env.example .env     # SECRET_KEY обязателен, остальное compose перекроет
+cp .env.example .env     # SECRET_KEY is required, compose overrides the rest
 docker compose up --build
 ```
 
-Поднимутся Postgres и приложение на http://127.0.0.1:8000/. Всё, что нужно для
-старта, делает `docker/entrypoint.sh`:
+Postgres and the application come up on http://127.0.0.1:8000/. Everything the
+start needs is done by `docker/entrypoint.sh`:
 
-1. `migrate` — схема и роли `admin` / `user` (их создаёт data-миграция);
-2. `seed_groups` — на случай, если роль удалили руками;
-3. `seed_demo_users` — **только если** `SEED_DEMO_USERS=1`;
-4. `collectstatic` — статика для whitenoise;
-5. `exec` на команду из `CMD`, то есть gunicorn.
+1. `migrate` — the schema and the `admin` / `user` roles (created by the data
+   migration);
+2. `seed_groups` — in case a role was deleted by hand;
+3. `seed_demo_users` — **only if** `SEED_DEMO_USERS=1`;
+4. `collectstatic` — static files for whitenoise;
+5. `exec` into the command from `CMD`, that is gunicorn.
 
-В `docker-compose.yml` флаг включён, поэтому сразу после `up` можно войти как
-`demo_admin` / `demo-password-123`. Для боевого запуска уберите переменную или
-поставьте `"0"` — в самом образе сид по умолчанию выключен, аккаунты с известным
-паролем в бою не нужны.
+The flag is on in `docker-compose.yml`, so right after `up` you can sign in as
+`demo_admin` / `demo-password-123`. For a production run drop the variable or
+set it to `"0"` — inside the image the seeding is off by default, and accounts
+with a known password have no business in production.
+
+Use `--build` after every `git checkout` or `git pull`. Plain
+`docker compose up -d` restarts the **existing** container, which may have been
+built from older code, and then you end up debugging code that is not running.
 
 ```bash
-docker compose exec web python manage.py createsuperuser   # свой аккаунт
-docker compose logs -f web                                 # логи, включая шаги старта
+docker compose exec web python manage.py createsuperuser   # your own account
+docker compose logs -f web                                 # logs, start-up steps included
 ```
 
-Статика собирается на этапе сборки образа, зависимости ставятся из
-`requirements.lock` (генерируется `pip-compile requirements.txt`), процесс внутри
-контейнера работает от непривилегированного пользователя `app`.
+Static files are collected while the image is built, dependencies are installed
+from `requirements.lock` (generated by `pip-compile requirements.txt`), and the
+process inside the container runs as the unprivileged `app` user.
 
-`migrate` в entrypoint рассчитан на один инстанс — при нескольких репликах они
-будут стартовать одновременно и гонки за миграции никто не разруливает. Это
-осознанное упрощение: в проде миграции гоняют отдельным шагом деплоя.
+The `migrate` call in the entrypoint assumes a single instance: with several
+replicas they would all start at once and nobody arbitrates the race for
+migrations. This is a deliberate simplification — in production migrations are
+run as a separate deployment step.
 
-### Что происходит с данными
+### What happens to the data
 
-База лежит в именованном томе `pgdata`, а не внутри контейнера, поэтому:
+The database lives in the named volume `pgdata` rather than inside the
+container, which means:
 
-| Команда | Что с данными |
+| Command | What happens to the data |
 | --- | --- |
-| `docker compose stop` / `restart` | сохраняются |
-| `docker compose down` | сохраняются (удаляются только контейнеры) |
-| `docker compose up` после выключения компьютера | сохраняются |
-| `docker compose down -v` | **удаляются вместе с томом** |
+| `docker compose stop` / `restart` | kept |
+| `docker compose down` | kept (only containers are removed) |
+| `docker compose up` after the machine was switched off | kept |
+| `docker compose down -v` | **deleted along with the volume** |
 
-То есть пропасть данные могут только от явного `-v`. При следующем старте
-entrypoint снова прогонит миграции и сид — на пустой базе получится чистый
-стенд, на существующей ничего не сломается: обе команды идемпотентны.
+So the data can only disappear through an explicit `-v`. On the next start the
+entrypoint runs the migrations and the seeding again: on an empty database that
+gives a clean stand, and on an existing one nothing breaks, because both
+commands are idempotent.
 
-## Деплой в AWS
+## Deploying to AWS
 
-Разворачивается всё приложение целиком — `/manage/`, `/files/` и остальное, —
-а не файловый менеджер отдельно.
+The whole application is deployed — `/manage/`, `/files/` and the rest — not the
+file manager on its own.
 
-### Что поднимается
+### What is created
 
-| Сервис | Зачем |
+| Service | What for |
 | --- | --- |
-| S3 | хранилище файлового менеджера, приватный бакет с шифрованием и блокировкой публичного доступа |
-| EC2 (t3.micro, free tier) | инстанс с Docker; тянет образ из GHCR и поднимает его вместе с Postgres |
-| IAM-роль инстанса | доступ к бакету **только** на `ListBucket`, `GetObject`, `PutObject`, `DeleteObject` — без ключей в коде и без `AdministratorAccess` |
-| Security group | наружу открыт только 80-й порт; SSH — лишь если явно указать свой адрес |
+| S3 | storage for the file manager: a private bucket with encryption and public access blocked |
+| EC2 (t3.micro, free tier) | an instance with Docker; it pulls the image from GHCR and brings it up together with Postgres |
+| Instance IAM role | access to the bucket limited to `ListBucket`, `GetObject`, `PutObject`, `DeleteObject` — no keys in the code and no `AdministratorAccess` |
+| Security group | only port 80 is open outward; SSH only if you name your own address |
 
 ```
-браузер → EC2 (:80 → gunicorn:8000) ─┬→ Postgres в контейнере на том же инстансе
-                                     └→ S3 (файлы), доступ по IAM-роли, IMDSv2
+browser → EC2 (:80 → gunicorn:8000) ─┬→ Postgres in a container on the same instance
+                                     └→ S3 (files), reached by IAM role, IMDSv2
 ```
 
-### Живой стенд
+### The live stand
 
-Развёрнут и проверен: приложение работает, файлы уезжают в S3.
+It was deployed and verified end to end — the application worked and files went
+into S3 — and then torn down, so the address below no longer answers. It is kept
+here as a record of what was checked.
 
 | | |
 | --- | --- |
-| Адрес | http://100.54.108.163/ |
-| Учётка для просмотра | `demo_admin` / `demo-password-123` |
-| Регион | `us-east-1` |
-| Бакет | `users-and-roles-files-f92fa1c9` |
-| Образ | `ghcr.io/senpai520120/django_application:0.2.0` |
+| Address | http://100.54.108.163/ (decommissioned) |
+| Account for a look around | `demo_admin` / `demo-password-123` |
+| Region | `us-east-1` |
+| Bucket | `users-and-roles-files-f92fa1c9` |
+| Image | `ghcr.io/senpai520120/django_application:0.2.0` |
 
-Стенд временный и будет погашен после проверки — команда сноса ниже.
-
-### Шаги
+### Steps
 
 ```bash
 cd deploy/aws
 terraform init
-terraform apply   -var region=us-east-1   -var bucket_name=имя-бакета-глобально-уникальное   -var key_name=имя-вашей-ключевой-пары   -var ssh_cidr=ваш.ip.адрес/32   -var image=ghcr.io/senpai520120/django_application:0.2.0
+terraform apply   -var region=us-east-1   -var bucket_name=your-globally-unique-bucket   -var key_name=your-key-pair-name   -var ssh_cidr=your.ip.address/32   -var image=ghcr.io/senpai520120/django_application:0.2.0
 ```
 
-Ключевая пара привязана к региону: разворачивайте туда же, где она создана.
-Файл `terraform.tfstate` содержит сгенерированные `SECRET_KEY` и пароль базы —
-он в `.gitignore`, коммитить и пересылать его нельзя.
+A key pair belongs to a region, so deploy into the same region where it was
+created. The `terraform.tfstate` file holds the generated `SECRET_KEY` and the
+database password — it is in `.gitignore`, and it must never be committed or
+passed around.
 
-Terraform выведет `app_url` — по нему приложение и открывается. Первый старт
-занимает пару минут: инстанс ставит Docker и тянет образ. `SECRET_KEY` и пароль
-базы генерируются самим Terraform и попадают только в `.env` на инстансе.
+Terraform prints `app_url`, and that is where the application opens. The first
+start takes a couple of minutes while the instance installs Docker and pulls the
+image. The `SECRET_KEY` and the database password are generated by Terraform
+itself and only ever land in `.env` on the instance.
 
-Приложение стартует с `FILE_STORAGE_BACKEND=s3`, поэтому загруженные файлы
-сразу уезжают в бакет. Проверить: загрузите файл в `/files/` и посмотрите
-`aws s3 ls s3://имя-бакета/filemanager/`.
+The application starts with `FILE_STORAGE_BACKEND=s3`, so uploaded files go into
+the bucket immediately. To check: upload a file in `/files/` and look at
+`aws s3 ls s3://your-bucket/filemanager/`.
 
-Если разворачиваете без Terraform, IAM-политика минимальных прав лежит в
-`deploy/aws/iam-policy.json` — подставьте туда имя бакета.
+If you deploy without Terraform, the least-privilege IAM policy is in
+`deploy/aws/iam-policy.json` — put your bucket name into it.
 
-### Как снести всё после проверки
+### Tearing it all down afterwards
 
 ```bash
 cd deploy/aws
 terraform destroy   -var region=us-east-1   -var bucket_name=users-and-roles-files-f92fa1c9   -var key_name=test_django
 ```
 
-Одна команда убирает инстанс, бакет вместе с файлами (`force_destroy = true`),
-IAM-роль, политику и security group. Ручная проверка, что ничего не капает:
+One command removes the instance, the bucket together with its files
+(`force_destroy = true`), the IAM role, the policy and the security group. A
+manual check that nothing keeps charging:
 
-- [ ] EC2 → Instances: инстанс `users-and-roles-app` в состоянии terminated;
-- [ ] S3 → бакета в списке нет;
-- [ ] IAM → Roles: роли `users-and-roles-app` нет;
-- [ ] EC2 → Security Groups: группы `users-and-roles-app` нет;
-- [ ] EC2 → Elastic IPs: нет висящих адресов (Terraform их не создаёт, но если
-      выдавали руками — освободите, они платные в простое);
-- [ ] Billing → Cost Explorer через сутки: по проекту ноль.
+- [ ] EC2 → Instances: the `users-and-roles-app` instance is terminated;
+- [ ] S3 → the bucket is not in the list;
+- [ ] IAM → Roles: no `users-and-roles-app` role;
+- [ ] EC2 → Security Groups: no `users-and-roles-app` group;
+- [ ] EC2 → Elastic IPs: no dangling addresses (Terraform creates none, but
+      release any you allocated by hand — they cost money while idle);
+- [ ] Billing → Cost Explorer a day later: zero for the project.
 
-## Проверить, что пароли захешированы
+## Checking that passwords are hashed
 
 ```bash
 # SQLite
@@ -556,55 +590,62 @@ python manage.py shell -c "from django.contrib.auth.models import User; print(Us
 psql "$DATABASE_URL" -c "select username, password from auth_user limit 5;"
 ```
 
-В колонке `password` должно быть что-то вида
-`pbkdf2_sha256$1000000$<соль>$<хеш>`. Это же проверяет тест
+The `password` column must hold something shaped like
+`pbkdf2_sha256$1000000$<salt>$<hash>`. The same thing is asserted by
 `tests/test_auth.py::test_password_is_stored_hashed`.
 
-## Структура
+## Layout
 
 ```
-config/           настройки, корневой urls.py, wsgi/asgi
-accounts/         аутентификация, домашняя страница, правила доступа, сид ролей
-  permissions.py    is_admin() и имена ролей
+config/           settings, root urls.py, wsgi/asgi
+accounts/         authentication, home page, access rules, role seeding
+  permissions.py    is_admin() and the role names
   mixins.py         AdminRequiredMixin
-  migrations/       data-миграция с ролями admin и user
-  management/       команда seed_groups
-panel/            кастомная админка на /manage/
-  views.py          списки, форма ролей, создание юзера, аудит
-  forms.py          формы поверх встроенных
-  models.py         RoleChange (аудит-лог)
-files/            файловый менеджер на /files/
-  paths.py          нормализация путей, защита от traversal
-  storage.py        контракт хранилища + local и s3
-  access.py         кто пускается в раздел
-  views.py          список, загрузка, переименование, удаление, скачивание
-e2e/              Playwright: сценарии в браузере
-deploy/aws/       Terraform: S3, IAM-роль, EC2
-templates/        base.html, registration/login.html, панель, 403/404/500
-static/css/       единственный css-файл
+  migrations/       data migration with the admin and user roles
+  management/       the seed_groups command
+panel/            the custom admin at /manage/
+  views.py          lists, the roles form, user creation, the audit log
+  forms.py          forms on top of the built-in ones
+  models.py         RoleChange (the audit log)
+files/            the file manager at /files/
+  paths.py          path normalisation, protection from traversal
+  storage.py        the storage contract plus local and s3
+  access.py         who gets into the section
+  views.py          listing, upload, rename, delete, download
+e2e/              Playwright: scenarios in a browser
+deploy/aws/       Terraform: S3, IAM role, EC2
+templates/        base.html, registration/login.html, the panel, 403/404/500
+static/css/       the single css file
 tests/            pytest-django
 ```
 
-## Известные ограничения
+## Known limitations
 
-* Аудит покрывает только изменение ролей. Создание пользователя и
-  активация/деактивация в `RoleChange` не пишутся: модель заточена под роли.
-  Чтобы логировать всё, её нужно обобщить до `AuditEntry` с полем `action`.
-* Нет защиты от перебора паролей. Форма логина не ограничивает попытки — в
-  боевом проекте сюда ставят `django-axes` или rate limit на уровне nginx.
-* `is_admin()` считает админом и участника группы `admin`, и любого `is_staff`.
-  Снять `is_staff` через панель нельзя — только через `/admin/` или shell;
-  в списке пользователей такие флаги видны отдельной колонкой.
+* The audit log covers role changes only. Creating a user and switching one on
+  or off are not written into `RoleChange`: the model is shaped around roles. To
+  log everything it would have to be generalised into an `AuditEntry` with an
+  `action` field.
+* There is no protection against password guessing. The login form does not
+  limit attempts — a production project would put `django-axes` here, or a rate
+  limit at the nginx level.
+* `is_admin()` treats both a member of the `admin` group and anyone with
+  `is_staff` as an admin. `is_staff` cannot be removed through the panel, only
+  through `/admin/` or a shell; in the user list such flags are shown in a
+  column of their own.
+* There is no custom 400 page. 403, 404 and 500 have templates, so a rejected
+  path shows Django's plain `Bad Request (400)` in production.
 
-## Что не делалось
+## What was left out
 
-Вне scope задачи:
+Outside the scope of the assignment:
 
-* регистрация пользователей через публичный UI — аккаунты заводит админ или
+* user registration through a public UI — accounts are created by an admin or by
   `createsuperuser`;
-* восстановление пароля, подтверждение email, OAuth/SSO;
-* REST API, SPA, JS-фреймворки;
-* отдельная модель `Role` — роль это `auth.Group`, дублировать её незачем
-  (описание роли понадобится — заведём `Role` с `OneToOne` на `Group`).
+* password recovery, email confirmation, OAuth/SSO;
+* a REST API, an SPA, JS frameworks;
+* a separate `Role` model — a role is an `auth.Group`, and duplicating it buys
+  nothing (should a role need a description, we would add `Role` with a
+  `OneToOne` to `Group`).
 
-Стандартный `/admin/` включён, но задача решена своей страницей `/manage/`.
+Django's stock `/admin/` is enabled, but the assignment is solved by our own
+`/manage/` page.

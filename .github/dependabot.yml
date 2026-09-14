@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Зависимости приложения и инструменты разработки.
+  # Application dependencies and development tools.
   - package-ecosystem: pip
     directory: "/"
     schedule:
@@ -10,8 +10,8 @@ updates:
       python-deps:
         patterns: ["*"]
 
-  # Браузерные тесты. Playwright выпускается часто, и версия пакета должна
-  # совпадать с версией браузеров, которую ставит CI.
+  # Browser tests. Playwright ships often, and the package version must
+  # match the browser version CI installs.
   - package-ecosystem: npm
     directory: "/e2e"
     schedule:
@@ -21,7 +21,7 @@ updates:
       e2e-deps:
         patterns: ["*"]
 
-  # Без группировки каждый экшен приезжает отдельным PR — их набирается шесть.
+  # Without grouping every action arrives as its own PR, and there are six.
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
@@ -31,7 +31,7 @@ updates:
       github-actions:
         patterns: ["*"]
 
-  # Базовый образ из Dockerfile.
+  # The base image from the Dockerfile.
   - package-ecosystem: docker
     directory: "/"
     schedule:
@@ -41,8 +41,8 @@ updates:
       docker-images:
         patterns: ["*"]
 
-  # Образы из docker-compose.yml (postgres, localstack) — это отдельная
-  # экосистема, ecosystem: docker их не видит.
+  # Images from docker-compose.yml (postgres, localstack) are a separate
+  # ecosystem; ecosystem: docker does not see them.
   - package-ecosystem: docker-compose
     directory: "/"
     schedule:

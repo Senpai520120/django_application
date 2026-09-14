@@ -2,15 +2,15 @@ import { expect, test as anonymous } from "@playwright/test";
 
 import { test } from "./support/fixtures";
 
-anonymous.describe("Доступ к разделу", () => {
-  anonymous("аноним отправляется на логин, а не видит файлы", async ({ page }) => {
+anonymous.describe("Section access", () => {
+  anonymous("an anonymous visitor is sent to login instead of seeing files", async ({ page }) => {
     await page.goto("/files/");
 
     await expect(page).toHaveURL("/login/?next=/files/");
-    await expect(page.getByRole("heading", { name: "Вход" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   });
 
-  anonymous("аноним не может открыть вложенную папку по прямой ссылке", async ({
+  anonymous("an anonymous visitor cannot open a nested folder by direct link", async ({
     page,
   }) => {
     await page.goto("/files/?path=docs");
@@ -18,43 +18,43 @@ anonymous.describe("Доступ к разделу", () => {
     await expect(page).toHaveURL(/\/login\//);
   });
 
-  anonymous("неверные данные не пускают и не выдают, есть ли такой юзер", async ({
+  anonymous("bad credentials are refused without revealing whether the user exists", async ({
     page,
   }) => {
     await page.goto("/login/");
 
-    await page.getByLabel("Имя пользователя").fill("demo_admin");
-    await page.getByLabel("Пароль").fill("совсем-не-тот-пароль");
-    await page.getByRole("button", { name: "Войти" }).click();
+    await page.getByLabel("Username").fill("demo_admin");
+    await page.getByLabel("Password").fill("definitely-not-the-password");
+    await page.getByRole("button", { name: "Sign in" }).click();
 
     const wrongPassword = await page.getByRole("listitem").first().innerText();
 
-    await expect(page.getByRole("heading", { name: "Вход" })).toBeVisible();
-    expect(wrongPassword).toContain("Пожалуйста, введите правильные");
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+    expect(wrongPassword).toContain("Please enter a correct");
 
-    await page.getByLabel("Имя пользователя").fill("такого-юзера-нет");
-    await page.getByLabel("Пароль").fill("совсем-не-тот-пароль");
-    await page.getByRole("button", { name: "Войти" }).click();
+    await page.getByLabel("Username").fill("no-such-user-here");
+    await page.getByLabel("Password").fill("definitely-not-the-password");
+    await page.getByRole("button", { name: "Sign in" }).click();
 
     const unknownUser = await page.getByRole("listitem").first().innerText();
 
-    // Тексты совпадают, значит по ответу нельзя понять, существует ли логин.
+    // Identical texts mean the response never tells whether the login exists.
     expect(unknownUser).toBe(wrongPassword);
   });
 });
 
-test.describe("Вход и переход в раздел", () => {
-  test("после логина в шапке есть ссылка на файлы", async ({ fileManager }) => {
+test.describe("Login and moving into the section", () => {
+  test("after login the header carries a link to the files", async ({ fileManager }) => {
     const { page } = fileManager;
 
-    await test.step("возвращаемся на главную", async () => {
+    await test.step("go back to the home page", async () => {
       await page.goto("/");
-      await expect(page.getByRole("heading", { name: /Вы вошли как/ })).toBeVisible();
+      await expect(page.getByRole("heading", { name: /You are signed in as/ })).toBeVisible();
     });
 
-    await test.step("переходим в файловый менеджер из шапки", async () => {
-      await page.getByRole("link", { name: "Файлы", exact: true }).click();
-      await expect(page.getByRole("heading", { name: "Файлы" })).toBeVisible();
+    await test.step("open the file manager from the header", async () => {
+      await page.getByRole("link", { name: "Files", exact: true }).click();
+      await expect(page.getByRole("heading", { name: "Files" })).toBeVisible();
       await expect(page).toHaveURL(/\/files\//);
     });
   });

@@ -1,14 +1,14 @@
 output "app_url" {
-  description = "Адрес приложения"
+  description = "Application address"
   value       = "http://${aws_instance.app.public_ip}/"
 }
 
 output "bucket" {
-  description = "Бакет с файлами"
+  description = "Bucket holding the files"
   value       = aws_s3_bucket.files.bucket
 }
 
 output "instance_id" {
-  description = "Инстанс приложения"
+  description = "Application instance"
   value       = aws_instance.app.id
 }

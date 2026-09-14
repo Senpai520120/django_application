@@ -7,13 +7,13 @@ from accounts.permissions import ADMIN_GROUP_NAME
 
 
 def roles_field(**kwargs):
-    """Чекбоксы со всеми ролями."""
-    kwargs.setdefault("label", _("Роли"))
+    """Checkboxes listing every role."""
+    kwargs.setdefault("label", _("Roles"))
     kwargs.setdefault("required", False)
     return forms.ModelMultipleChoiceField(
         queryset=Group.objects.order_by("name"),
         widget=forms.CheckboxSelectMultiple,
-        help_text=_("Отметьте роли, которые должны быть у пользователя."),
+        help_text=_("Tick the roles this user should hold."),
         **kwargs,
     )
 
@@ -30,7 +30,7 @@ class UserRolesForm(forms.ModelForm):
         self.editor = editor
 
     def clean_groups(self):
-        """Не дать администратору закрыть панель самому себе."""
+        """Keep an admin from locking themselves out of the panel."""
         groups = self.cleaned_data["groups"]
         editing_self = self.editor is not None and self.editor.pk == self.instance.pk
         if not editing_self:
@@ -43,13 +43,16 @@ class UserRolesForm(forms.ModelForm):
         )
         if not keeps_access:
             raise forms.ValidationError(
-                _("Нельзя снять с себя роль admin: вы потеряете доступ к панели.")
+                _(
+                    "You cannot take the admin role from yourself: "
+                    "you would lose access to the panel."
+                )
             )
         return groups
 
 
 class PanelUserCreationForm(UserCreationForm):
-    """Поверх UserCreationForm: валидация и хеширование пароля уже там."""
+    """Built on UserCreationForm: password validation and hashing come with it."""
 
     email = forms.EmailField(label=_("Email"), required=False)
     groups = roles_field()

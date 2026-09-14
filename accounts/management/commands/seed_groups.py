@@ -5,7 +5,7 @@ from accounts.permissions import DEFAULT_GROUP_NAMES
 
 
 class Command(BaseCommand):
-    help = "Создаёт базовые роли-группы (admin, user). Запускать можно повторно."
+    help = "Create the baseline role groups (admin, user). Safe to re-run."
 
     def handle(self, *args, **options):
         created_names = []
@@ -13,13 +13,13 @@ class Command(BaseCommand):
             _, created = Group.objects.get_or_create(name=name)
             if created:
                 created_names.append(name)
-                self.stdout.write(self.style.SUCCESS(f"Роль создана: {name}"))
+                self.stdout.write(self.style.SUCCESS(f"Role created: {name}"))
             else:
-                self.stdout.write(f"Роль уже существует: {name}")
+                self.stdout.write(f"Role already exists: {name}")
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Готово. Создано ролей: {len(created_names)}, "
-                f"всего базовых ролей: {len(DEFAULT_GROUP_NAMES)}."
+                f"Done. Roles created: {len(created_names)}, "
+                f"baseline roles in total: {len(DEFAULT_GROUP_NAMES)}."
             )
         )

@@ -1,4 +1,4 @@
-"""Команда с тестовыми пользователями."""
+"""The demo users command."""
 
 import pytest
 from django.contrib.auth.models import User
@@ -10,7 +10,7 @@ from accounts.management.commands.seed_demo_users import DEFAULT_PASSWORD, DEMO_
 
 @pytest.fixture
 def debug_mode(settings):
-    """Команда работает только в разработке."""
+    """The command runs in development only."""
     settings.DEBUG = True
     return settings
 
@@ -47,7 +47,7 @@ def test_custom_password_and_extra_users(debug_mode):
 
     demo_users = User.objects.filter(username__startswith=DEMO_PREFIX)
 
-    assert demo_users.count() == 7  # 4 базовых + 3 дополнительных
+    assert demo_users.count() == 7  # 4 baseline plus 3 extra
     assert User.objects.get(username="demo_user03").check_password("My-Own-Pass-42")
 
 

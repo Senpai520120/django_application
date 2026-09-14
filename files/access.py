@@ -1,14 +1,14 @@
-"""Правило доступа к файловому менеджеру.
+"""Access rule for the file manager.
 
-Раздел общий для команды, поэтому он открыт всем залогиненным пользователям —
-в отличие от панели /manage/, которая требует роли admin. Чтобы отдать файлы
-только администраторам, достаточно поменять здесь базовый класс на
-`accounts.mixins.AdminRequiredMixin`: вьюхи наследуются от этого миксина и
-больше нигде прав не проверяют.
+The section is shared by the whole team, so it is open to every signed-in user,
+unlike the /manage/ panel, which requires the admin role. To hand the files to
+administrators only, swap the base class here for
+`accounts.mixins.AdminRequiredMixin`: the views inherit from this mixin and
+check permissions nowhere else.
 """
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 
 
 class FileManagerAccessMixin(LoginRequiredMixin):
-    """Аноним уходит на логин, любой вошедший пользователь работает с файлами."""
+    """Anonymous goes to login; any signed-in user may work with the files."""

@@ -1,19 +1,19 @@
-"""Настройки для тестов: не зависят от .env и от собранной статики."""
+"""Test settings: independent of .env and of collected static files."""
 
 import os
 
-# Выставляем до импорта основных настроек: там SECRET_KEY проверяется на импорте,
-# а read_env не перетирает уже заданные переменные окружения.
+# Set before importing the main settings: they validate SECRET_KEY at import
+# time, and read_env never overwrites variables already present in the env.
 os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production")
 os.environ.setdefault("DEBUG", "False")
 
 from .settings import *  # noqa: E402, F403
 
-# Манифест whitenoise требует collectstatic, в тестах он не нужен.
+# The whitenoise manifest requires collectstatic, which tests do not need.
 STORAGES = {
     **STORAGES,  # noqa: F405
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
 
-# Тесты создают десятки пользователей — на PBKDF2 это заметные секунды.
+# Tests create dozens of users, and PBKDF2 turns that into visible seconds.
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

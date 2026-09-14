@@ -1,7 +1,7 @@
-"""Контракт хранилища.
+"""The storage contract.
 
-Один и тот же набор проверок прогоняется дважды: для локального диска и для
-S3 (через moto). Если поведение реализаций разойдётся — тест это покажет.
+The very same set of checks runs twice: against the local disk and against S3
+(through moto). If the two implementations ever drift apart, this shows it.
 """
 
 import boto3
@@ -52,7 +52,7 @@ def s3_storage(settings, monkeypatch):
 
 @pytest.fixture(params=["local", "s3"])
 def storage(request):
-    """Оба backend'а под одним именем — тесты ниже пишутся один раз."""
+    """Both backends behind one name, so the tests below are written once."""
     return request.getfixturevalue(f"{request.param}_storage")
 
 
@@ -200,7 +200,7 @@ def test_missing_paths_report_errors(storage):
     "path", ["../escape", "../../etc/passwd", "/etc/passwd", "docs/../../escape"]
 )
 def test_storage_api_rejects_traversal(storage, path):
-    """Даже в обход форм: сам storage не должен пускать за пределы корня."""
+    """Even bypassing the forms: the storage itself must not leave the root."""
     with pytest.raises(SuspiciousFileOperation):
         storage.make_dir(path)
 
@@ -220,7 +220,7 @@ def test_total_size_counts_all_files(storage):
 
 
 def test_local_storage_blocks_symlink_escape(tmp_path):
-    """Симлинк наружу — единственный обход лексической проверки пути."""
+    """A symlink outwards is the only way around the lexical path check."""
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "secret.txt").write_text("secret", encoding="utf-8")
@@ -231,7 +231,7 @@ def test_local_storage_blocks_symlink_escape(tmp_path):
     try:
         link.symlink_to(outside, target_is_directory=True)
     except OSError:
-        pytest.skip("нет прав на создание симлинков")
+        pytest.skip("no permission to create symlinks")
 
     storage = LocalFileStorage(root)
 

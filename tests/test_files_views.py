@@ -1,4 +1,4 @@
-"""Вьюхи файлового менеджера: доступ, лимиты, безопасность путей."""
+"""File manager views: access, limits, and path safety."""
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -14,7 +14,7 @@ FILE_URLS = [
 
 @pytest.fixture
 def file_root(tmp_path, settings):
-    """Каждый тест работает в своей папке — мусор не переезжает между тестами."""
+    """Each test works in its own folder, so leftovers never travel between tests."""
     settings.FILE_MANAGER = {
         **settings.FILE_MANAGER,
         "BACKEND": "local",
@@ -59,7 +59,7 @@ def test_logged_in_user_sees_empty_root(user_client):
 
     assert response.status_code == 200
     assert response.context["entries"] == []
-    assert "Папка пуста" in response.content.decode()
+    assert "Folder is empty" in response.content.decode()
 
 
 @pytest.mark.django_db
@@ -67,7 +67,7 @@ def test_logged_in_user_sees_empty_root(user_client):
     "path", ["../etc/passwd", "/etc/passwd", "docs/../../secret", "c:/windows"]
 )
 def test_traversal_in_query_gives_400(user_client, path):
-    """Путь наружу — это плохой запрос, а не 500 и не тихий доступ."""
+    """A path leading outside is a bad request, not a 500 and not silent access."""
     response = browse(user_client, path)
 
     assert response.status_code == 400
@@ -97,7 +97,7 @@ def test_duplicate_folder_shows_error(user_client):
 
     assert response.status_code == 200
     messages = [str(message) for message in response.context["messages"]]
-    assert any("уже существует" in message for message in messages)
+    assert any("already exists" in message for message in messages)
 
 
 @pytest.mark.django_db
@@ -155,7 +155,7 @@ def test_upload_over_the_limit_is_refused(user_client, settings):
     assert response.status_code == 200
     assert response.context["entries"] == []
     messages = [str(message) for message in response.context["messages"]]
-    assert any("больше допустимых" in message for message in messages)
+    assert any("larger than the allowed" in message for message in messages)
 
 
 @pytest.mark.django_db
@@ -169,7 +169,7 @@ def test_upload_over_total_limit_is_refused(user_client, settings):
 
     assert response.context["entries"] == []
     messages = [str(message) for message in response.context["messages"]]
-    assert any("лимит хранилища" in message for message in messages)
+    assert any("storage limit" in message for message in messages)
 
 
 @pytest.mark.django_db
@@ -188,7 +188,7 @@ def test_download_returns_attachment(user_client):
 
 @pytest.mark.django_db
 def test_executable_upload_is_served_as_attachment(user_client):
-    """Опасное расширение отдаётся вложением, а не исполняется браузером."""
+    """A dangerous extension is served as an attachment, not run by the browser."""
     user_client.post(
         reverse("files:upload"),
         {
@@ -246,7 +246,7 @@ def test_delete_asks_for_confirmation_first(user_client):
     confirm = user_client.get(reverse("files:delete"), {"path": "notes.txt"})
 
     assert confirm.status_code == 200
-    # GET ничего не удаляет — файл на месте.
+    # GET deletes nothing, the file is still there.
     assert [entry.name for entry in browse(user_client).context["entries"]] == [
         "notes.txt"
     ]
@@ -277,7 +277,7 @@ def test_delete_warns_that_folder_is_removed_with_content(user_client):
 
     response = user_client.get(reverse("files:delete"), {"path": "docs"})
 
-    assert "вместе со всем содержимым" in response.content.decode()
+    assert "with everything inside" in response.content.decode()
 
 
 @pytest.mark.django_db

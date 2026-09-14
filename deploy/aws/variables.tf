@@ -1,34 +1,34 @@
 variable "region" {
-  description = "Регион AWS"
+  description = "AWS region"
   type        = string
   default     = "eu-central-1"
 }
 
 variable "bucket_name" {
-  description = "Имя S3-бакета для файлов (должно быть глобально уникальным)"
+  description = "S3 bucket name for the files (must be globally unique)"
   type        = string
 }
 
 variable "instance_type" {
-  description = "Тип инстанса. t3.micro входит во free tier"
+  description = "Instance type. t3.micro is inside the free tier"
   type        = string
   default     = "t3.micro"
 }
 
 variable "image" {
-  description = "Docker-образ приложения, опубликованный CI"
+  description = "Application Docker image published by CI"
   type        = string
   default     = "ghcr.io/senpai520120/django_application:latest"
 }
 
 variable "ssh_cidr" {
-  description = "С какого адреса пускать SSH. Пусто — порт закрыт совсем"
+  description = "Address allowed to reach SSH. Empty closes the port entirely"
   type        = string
   default     = ""
 }
 
 variable "key_name" {
-  description = "Имя SSH-ключа в AWS. Пусто — без ключа"
+  description = "SSH key name in AWS. Empty means no key"
   type        = string
   default     = ""
 }

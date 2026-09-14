@@ -1,10 +1,10 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
- * Page Object файлового менеджера.
+ * Page Object of the file manager.
  *
- * Все локаторы — по роли, лейблу или aria-label: они переживают правку вёрстки,
- * в отличие от CSS-селекторов, которые выдаёт codegen.
+ * Every locator goes through a role, a label or an aria-label: those survive
+ * markup edits, unlike the CSS selectors codegen hands out.
  */
 export class FileManagerPage {
   constructor(readonly page: Page) {}
@@ -16,14 +16,14 @@ export class FileManagerPage {
   }
 
   get heading(): Locator {
-    return this.page.getByRole("heading", { name: "Файлы" });
+    return this.page.getByRole("heading", { name: "Files" });
   }
 
   get status(): Locator {
     return this.page.getByRole("status");
   }
 
-  /** Строка таблицы, в которой лежит запись с таким именем. */
+  /** The table row holding an entry with this name. */
   row(name: string): Locator {
     return this.page
       .getByRole("row")
@@ -35,8 +35,8 @@ export class FileManagerPage {
   }
 
   async createFolder(name: string): Promise<void> {
-    await this.page.getByLabel("Новая папка").fill(name);
-    await this.page.getByRole("button", { name: "Создать папку" }).click();
+    await this.page.getByLabel("New folder").fill(name);
+    await this.page.getByRole("button", { name: "Create folder" }).click();
   }
 
   async openFolder(name: string): Promise<void> {
@@ -49,37 +49,37 @@ export class FileManagerPage {
   }
 
   async goToRootCrumb(): Promise<void> {
-    await this.page.getByRole("link", { name: "Корень", exact: true }).click();
+    await this.page.getByRole("link", { name: "Root", exact: true }).click();
   }
 
   async goUp(): Promise<void> {
-    await this.page.getByRole("link", { name: "← Наверх" }).click();
+    await this.page.getByRole("link", { name: "← Up" }).click();
   }
 
-  /** Загрузка файлов, собранных прямо в памяти теста. */
+  /** Upload files assembled right in the test's memory. */
   async uploadFiles(
     files: { name: string; mimeType: string; buffer: Buffer }[],
   ): Promise<void> {
-    await this.page.getByLabel("Загрузить файлы").setInputFiles(files);
-    await this.page.getByRole("button", { name: "Загрузить", exact: true }).click();
+    await this.page.getByLabel("Upload files").setInputFiles(files);
+    await this.page.getByRole("button", { name: "Upload", exact: true }).click();
   }
 
   async renameEntry(name: string, newName: string): Promise<void> {
-    await this.page.getByRole("link", { name: `Переименовать ${name}` }).click();
-    await this.page.getByLabel("Новое имя").fill(newName);
-    await this.page.getByRole("button", { name: "Сохранить" }).click();
+    await this.page.getByRole("link", { name: `Rename ${name}` }).click();
+    await this.page.getByLabel("New name").fill(newName);
+    await this.page.getByRole("button", { name: "Save" }).click();
   }
 
   async deleteEntry(name: string, confirm = true): Promise<void> {
-    await this.page.getByRole("link", { name: `Удалить ${name}` }).click();
+    await this.page.getByRole("link", { name: `Delete ${name}` }).click();
     if (confirm) {
-      await this.page.getByRole("button", { name: "Удалить" }).click();
+      await this.page.getByRole("button", { name: "Delete" }).click();
     } else {
-      await this.page.getByRole("link", { name: "Отмена" }).click();
+      await this.page.getByRole("link", { name: "Cancel" }).click();
     }
   }
 
-  /** Удаление в уборке после теста: не падаем, если запись уже исчезла. */
+  /** Deletion during cleanup: do not fail if the entry is already gone. */
   async removeIfExists(name: string): Promise<void> {
     await this.goto();
     if ((await this.entryLink(name).count()) > 0) {

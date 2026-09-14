@@ -1,4 +1,4 @@
-"""Сид ролей: data-миграция и management-команда."""
+"""Role seeding: the data migration and the management command."""
 
 import pytest
 from django.contrib.auth.models import Group
@@ -9,7 +9,7 @@ from accounts.permissions import DEFAULT_GROUP_NAMES
 
 @pytest.mark.django_db
 def test_migration_creates_default_groups():
-    """Роли появляются уже после `migrate`, отдельных действий не нужно."""
+    """Roles exist right after `migrate`; nothing else has to be run."""
     assert set(Group.objects.values_list("name", flat=True)) == set(DEFAULT_GROUP_NAMES)
 
 

@@ -1,10 +1,10 @@
-"""Единый интерфейс хранения для файлового менеджера.
+"""One storage interface for the file manager.
 
-Вьюхи работают только с этим интерфейсом и не знают, где лежат файлы.
-Реализации строятся поверх штатного `django.core.files.storage`: локально —
-`FileSystemStorage`, в проде — `S3Boto3Storage` из django-storages. Добавить
-третий backend — значит написать ещё один подкласс и вернуть его из
-`get_storage()`; шаблоны и вьюхи при этом не меняются.
+The views talk to this interface only and never learn where the files live.
+The implementations sit on top of the stock `django.core.files.storage`:
+`FileSystemStorage` locally, `S3Boto3Storage` from django-storages in
+production. Adding a third backend means writing one more subclass and
+returning it from `get_storage()`; templates and views stay untouched.
 """
 
 from __future__ import annotations
@@ -23,16 +23,16 @@ from django.utils import timezone
 
 from files.paths import normalize_path
 
-#: Пустая папка в S3 — объект нулевого размера с ключом, оканчивающимся на «/».
+#: An empty folder in S3 is a zero-length object whose key ends with "/".
 S3_DIR_MARKER_SUFFIX = "/"
 
-#: Сколько ключей S3 удаляет за один запрос delete_objects.
+#: How many keys S3 removes in a single delete_objects request.
 S3_DELETE_BATCH = 1000
 
 
 @dataclass(frozen=True)
 class Entry:
-    """Строка списка: файл или папка."""
+    """One listing row: a file or a folder."""
 
     name: str
     path: str
@@ -46,55 +46,55 @@ class Entry:
 
 
 class StorageError(Exception):
-    """Ошибка, которую можно показать пользователю."""
+    """An error safe to show to the user (its text reaches the UI)."""
 
 
 class FileManagerStorage(ABC):
-    """Контракт хранилища. Обе реализации обязаны вести себя одинаково."""
+    """The storage contract. Both implementations must behave identically."""
 
     @abstractmethod
     def list_dir(self, path: str = "") -> list[Entry]:
-        """Содержимое папки, отсортированное: сначала папки, потом файлы."""
+        """Folder contents, sorted with folders first and files after."""
 
     @abstractmethod
     def make_dir(self, path: str) -> None:
-        """Создать папку. Если она уже есть — StorageError."""
+        """Create a folder. Raises StorageError if it already exists."""
 
     @abstractmethod
     def save(self, path: str, file) -> str:
-        """Записать файл. Если такой уже есть — StorageError."""
+        """Write a file. Raises StorageError if one already exists."""
 
     @abstractmethod
     def open(self, path: str):
-        """Открыть файл на чтение."""
+        """Open a file for reading."""
 
     @abstractmethod
     def delete(self, path: str) -> None:
-        """Удалить файл или папку (папку — рекурсивно)."""
+        """Delete a file or a folder (folders are removed recursively)."""
 
     @abstractmethod
     def rename(self, path: str, new_name: str) -> str:
-        """Переименовать файл или папку внутри той же родительской папки."""
+        """Rename a file or folder inside the same parent folder."""
 
     @abstractmethod
     def exists(self, path: str) -> bool:
-        """Есть ли по этому пути файл или папка."""
+        """Whether a file or folder exists at this path."""
 
     @abstractmethod
     def is_dir(self, path: str) -> bool:
-        """Папка ли это."""
+        """Whether the path is a folder."""
 
     @abstractmethod
     def size(self, path: str) -> int:
-        """Размер файла в байтах."""
+        """File size in bytes."""
 
     @abstractmethod
     def total_size(self) -> int:
-        """Суммарный объём хранилища — для лимита на общий размер."""
+        """Total size of the storage, used for the overall size limit."""
 
 
 class LocalFileStorage(FileManagerStorage):
-    """Файлы физически лежат на диске сервера."""
+    """Files physically live on the server disk."""
 
     def __init__(self, location: str | Path):
         self._root = Path(location).resolve()
@@ -102,21 +102,21 @@ class LocalFileStorage(FileManagerStorage):
         self._storage = FileSystemStorage(location=str(self._root))
 
     def _absolute(self, path: str) -> Path:
-        """Абсолютный путь с проверкой, что он не вышел за корень.
+        """Absolute path, checked to stay inside the root.
 
-        `normalize_path` отбивает `..` лексически, но остаётся симлинк, который
-        уводит наружу уже после разрешения пути — поэтому проверяем результат.
+        `normalize_path` rejects `..` lexically, but a symlink can still lead
+        outside once the path is resolved, so the result is checked too.
         """
         relative = normalize_path(path)
         target = (self._root / relative).resolve()
         if target != self._root and self._root not in target.parents:
-            raise SuspiciousFileOperation("Путь выходит за пределы хранилища.")
+            raise SuspiciousFileOperation("The path leaves the storage root.")
         return target
 
     def list_dir(self, path: str = "") -> list[Entry]:
         base = self._absolute(path)
         if not base.is_dir():
-            raise StorageError("Папка не найдена.")
+            raise StorageError("Folder not found.")
 
         relative = normalize_path(path)
         entries = []
@@ -146,29 +146,29 @@ class LocalFileStorage(FileManagerStorage):
     def make_dir(self, path: str) -> None:
         target = self._absolute(path)
         if target.exists():
-            raise StorageError("Папка или файл с таким именем уже существует.")
+            raise StorageError("A folder or file with this name already exists.")
         target.mkdir(parents=True)
 
     def save(self, path: str, file) -> str:
         relative = normalize_path(path)
         if self.exists(relative):
-            raise StorageError("Файл с таким именем уже существует.")
+            raise StorageError("A file with this name already exists.")
         return self._storage.save(relative, file)
 
     def open(self, path: str):
         target = self._absolute(path)
         if not target.is_file():
-            raise StorageError("Файл не найден.")
+            raise StorageError("File not found.")
         return self._storage.open(normalize_path(path), "rb")
 
     def delete(self, path: str) -> None:
         relative = normalize_path(path)
         if not relative:
-            raise StorageError("Корневую папку удалить нельзя.")
+            raise StorageError("The root folder cannot be deleted.")
 
         target = self._absolute(relative)
         if not target.exists():
-            raise StorageError("Файл или папка не найдены.")
+            raise StorageError("File or folder not found.")
 
         if target.is_dir():
             shutil.rmtree(target)
@@ -180,11 +180,11 @@ class LocalFileStorage(FileManagerStorage):
 
         relative = normalize_path(path)
         if not relative:
-            raise StorageError("Корневую папку переименовать нельзя.")
+            raise StorageError("The root folder cannot be renamed.")
 
         source = self._absolute(relative)
         if not source.exists():
-            raise StorageError("Файл или папка не найдены.")
+            raise StorageError("File or folder not found.")
 
         parent = parent_path(relative)
         new_relative = (
@@ -194,7 +194,7 @@ class LocalFileStorage(FileManagerStorage):
         )
         destination = self._absolute(new_relative)
         if destination.exists():
-            raise StorageError("Файл или папка с таким именем уже существует.")
+            raise StorageError("A file or folder with this name already exists.")
 
         source.rename(destination)
         return new_relative
@@ -208,7 +208,7 @@ class LocalFileStorage(FileManagerStorage):
     def size(self, path: str) -> int:
         target = self._absolute(path)
         if not target.is_file():
-            raise StorageError("Файл не найден.")
+            raise StorageError("File not found.")
         return target.stat().st_size
 
     def total_size(self) -> int:
@@ -216,7 +216,7 @@ class LocalFileStorage(FileManagerStorage):
 
 
 class S3FileStorage(FileManagerStorage):
-    """Файлы лежат в S3. Папки виртуальные: это префиксы ключей."""
+    """Files live in S3. Folders are virtual: they are key prefixes."""
 
     def __init__(self, location: str = ""):
         from storages.backends.s3 import S3Storage
@@ -233,7 +233,7 @@ class S3FileStorage(FileManagerStorage):
         return self._storage.connection.meta.client
 
     def _key(self, path: str) -> str:
-        """Полный ключ объекта: префикс хранилища плюс относительный путь."""
+        """Full object key: the storage prefix plus the relative path."""
         relative = normalize_path(path)
         if self._location and relative:
             return f"{self._location}/{relative}"
@@ -253,7 +253,7 @@ class S3FileStorage(FileManagerStorage):
         relative = normalize_path(path)
 
         if relative and not self.is_dir(relative):
-            raise StorageError("Папка не найдена.")
+            raise StorageError("Folder not found.")
 
         entries: list[Entry] = []
         paginator = self._client.get_paginator("list_objects_v2")
@@ -273,7 +273,7 @@ class S3FileStorage(FileManagerStorage):
                 )
             for obj in page.get("Contents", ()):
                 name = obj["Key"][len(prefix) :]
-                if not name:  # маркер самой папки
+                if not name:  # the folder marker itself
                     continue
                 entries.append(
                     Entry(
@@ -290,9 +290,9 @@ class S3FileStorage(FileManagerStorage):
     def make_dir(self, path: str) -> None:
         relative = normalize_path(path)
         if not relative:
-            raise StorageError("Пустое имя папки.")
+            raise StorageError("Empty folder name.")
         if self.exists(relative):
-            raise StorageError("Папка или файл с таким именем уже существует.")
+            raise StorageError("A folder or file with this name already exists.")
         self._client.put_object(
             Bucket=self._bucket, Key=self._dir_prefix(relative), Body=b""
         )
@@ -300,26 +300,26 @@ class S3FileStorage(FileManagerStorage):
     def save(self, path: str, file) -> str:
         relative = normalize_path(path)
         if self.exists(relative):
-            raise StorageError("Файл с таким именем уже существует.")
+            raise StorageError("A file with this name already exists.")
         return self._storage.save(relative, file)
 
     def open(self, path: str):
         relative = normalize_path(path)
         if not self._file_exists(relative):
-            raise StorageError("Файл не найден.")
+            raise StorageError("File not found.")
         return self._storage.open(relative, "rb")
 
     def delete(self, path: str) -> None:
         relative = normalize_path(path)
         if not relative:
-            raise StorageError("Корневую папку удалить нельзя.")
+            raise StorageError("The root folder cannot be deleted.")
 
         if self._file_exists(relative):
             self._storage.delete(relative)
             return
 
         if not self.is_dir(relative):
-            raise StorageError("Файл или папка не найдены.")
+            raise StorageError("File or folder not found.")
 
         self._delete_prefix(self._dir_prefix(relative))
 
@@ -340,14 +340,14 @@ class S3FileStorage(FileManagerStorage):
 
         relative = normalize_path(path)
         if not relative:
-            raise StorageError("Корневую папку переименовать нельзя.")
+            raise StorageError("The root folder cannot be renamed.")
 
         parent = parent_path(relative)
         cleaned = clean_name(new_name)
         new_relative = posixpath.join(parent, cleaned) if parent else cleaned
 
         if self.exists(new_relative):
-            raise StorageError("Файл или папка с таким именем уже существует.")
+            raise StorageError("A file or folder with this name already exists.")
 
         if self._file_exists(relative):
             self._copy(self._key(relative), self._key(new_relative))
@@ -355,7 +355,7 @@ class S3FileStorage(FileManagerStorage):
             return new_relative
 
         if not self.is_dir(relative):
-            raise StorageError("Файл или папка не найдены.")
+            raise StorageError("File or folder not found.")
 
         old_prefix = self._dir_prefix(relative)
         new_prefix = self._dir_prefix(new_relative)
@@ -394,7 +394,7 @@ class S3FileStorage(FileManagerStorage):
     def size(self, path: str) -> int:
         relative = normalize_path(path)
         if not self._file_exists(relative):
-            raise StorageError("Файл не найден.")
+            raise StorageError("File not found.")
         return self._storage.size(relative)
 
     def total_size(self) -> int:
@@ -403,7 +403,7 @@ class S3FileStorage(FileManagerStorage):
 
 
 def get_storage() -> FileManagerStorage:
-    """Хранилище, выбранное настройками. Единственная точка выбора backend'а."""
+    """The storage chosen by settings. The only place a backend is picked."""
     backend = settings.FILE_MANAGER["BACKEND"]
 
     if backend == "local":
@@ -412,6 +412,6 @@ def get_storage() -> FileManagerStorage:
         return S3FileStorage(location=settings.FILE_MANAGER["S3_LOCATION"])
 
     raise ImproperlyConfigured(
-        f"Неизвестный backend файлового менеджера: {backend!r}. "
-        "Допустимые значения FILE_STORAGE_BACKEND: local, s3."
+        f"Unknown file manager backend: {backend!r}. "
+        "Allowed values of FILE_STORAGE_BACKEND: local, s3."
     )

@@ -10,8 +10,8 @@ RUN pip install --no-cache-dir -r requirements.lock
 
 COPY . .
 
-# Статика собирается на сборке, а не на каждом старте контейнера.
-# SECRET_KEY здесь фиктивный: collectstatic его не использует, но настройки требуют.
+# Static files are collected at build time, not on every container start.
+# SECRET_KEY here is a dummy: collectstatic never uses it, settings demand it.
 RUN mkdir -p /app/filemanager \
     && SECRET_KEY=build-time-only DEBUG=False python manage.py collectstatic --noinput \
     && chmod +x /app/docker/entrypoint.sh \

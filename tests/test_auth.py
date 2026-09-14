@@ -1,4 +1,4 @@
-"""Аутентификация на встроенных вьюхах django.contrib.auth."""
+"""Authentication on the built-in django.contrib.auth views."""
 
 import pytest
 from django.contrib.auth import SESSION_KEY
@@ -9,7 +9,7 @@ from django.urls import reverse
 
 
 def login_errors(client, username, password):
-    """Отправляет форму логина и возвращает общие (non-field) ошибки."""
+    """Submit the login form and return the non-field errors."""
     response = client.post(
         reverse("login"), {"username": username, "password": password}
     )
@@ -46,7 +46,7 @@ def test_login_with_wrong_password_fails(client, plain_user):
 
 @pytest.mark.django_db
 def test_login_error_does_not_leak_whether_user_exists(client, plain_user):
-    """Сообщение одинаковое и для чужого логина, и для неверного пароля."""
+    """The message is identical for an unknown login and a wrong password."""
     unknown_user_errors = login_errors(client, "no-such-user", "wrong-password")
     wrong_password_errors = login_errors(client, plain_user.username, "wrong-password")
 
@@ -67,7 +67,7 @@ def test_inactive_user_cannot_login(client, plain_user, password):
 
 @pytest.mark.django_db
 def test_password_is_stored_hashed(settings, password):
-    """В auth_user лежит хеш, а не пароль. Хешер берём боевой, не тестовый."""
+    """auth_user stores a hash, not the password. Uses the real hasher."""
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.PBKDF2PasswordHasher"]
     user = User.objects.create_user(username="hashcheck", password=password)
 
@@ -112,7 +112,7 @@ def test_home_shows_username_and_roles(client, plain_user):
     content = response.content.decode()
     assert plain_user.username in content
     assert "user" in content
-    # Обычный пользователь не видит ссылку на панель.
+    # A regular user does not see the link to the panel.
     assert reverse("panel:user_list") not in content
 
 

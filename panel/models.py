@@ -1,4 +1,4 @@
-"""Аудит-лог изменений ролей."""
+"""Audit log of role changes."""
 
 from django.conf import settings
 from django.contrib.auth.models import Group
@@ -6,13 +6,13 @@ from django.db import models
 
 
 class RoleChange(models.Model):
-    """Кто, кому и какую роль назначил или снял."""
+    """Who granted or revoked which role, and to whom."""
 
     ACTION_ADDED = "added"
     ACTION_REMOVED = "removed"
     ACTION_CHOICES = [
-        (ACTION_ADDED, "назначена"),
-        (ACTION_REMOVED, "снята"),
+        (ACTION_ADDED, "granted"),
+        (ACTION_REMOVED, "revoked"),
     ]
 
     actor = models.ForeignKey(
@@ -21,7 +21,7 @@ class RoleChange(models.Model):
         null=True,
         blank=True,
         related_name="role_changes_made",
-        verbose_name="кто изменил",
+        verbose_name="changed by",
     )
     target = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -29,7 +29,7 @@ class RoleChange(models.Model):
         null=True,
         blank=True,
         related_name="role_changes_received",
-        verbose_name="кому",
+        verbose_name="target",
     )
     group = models.ForeignKey(
         Group,
@@ -37,30 +37,27 @@ class RoleChange(models.Model):
         null=True,
         blank=True,
         related_name="role_changes",
-        verbose_name="роль",
+        verbose_name="role",
     )
-    # Имена дублируем строкой, чтобы запись пережила удаление группы и юзера.
-    group_name = models.CharField("имя роли", max_length=150)
-    target_username = models.CharField("кому (логин)", max_length=150)
-    action = models.CharField("действие", max_length=16, choices=ACTION_CHOICES)
-    created_at = models.DateTimeField("когда", auto_now_add=True, db_index=True)
+    # Names are copied as plain text so a record outlives the group or the user.
+    group_name = models.CharField("role name", max_length=150)
+    target_username = models.CharField("target username", max_length=150)
+    action = models.CharField("action", max_length=16, choices=ACTION_CHOICES)
+    created_at = models.DateTimeField("created at", auto_now_add=True, db_index=True)
 
     class Meta:
-        verbose_name = "изменение роли"
-        verbose_name_plural = "изменения ролей"
+        verbose_name = "role change"
+        verbose_name_plural = "role changes"
         ordering = ["-created_at", "-id"]
 
     def __str__(self):
-        actor = self.actor.username if self.actor else "система"
+        actor = self.actor.username if self.actor else "system"
         verb = self.get_action_display()
-        return (
-            f"{actor}: роль «{self.group_name}» {verb} "
-            f"пользователю {self.target_username}"
-        )
+        return f"{actor}: role {self.group_name} {verb} " f"for {self.target_username}"
 
     @classmethod
     def log_diff(cls, *, actor, target, before, after):
-        """Пишет разницу двух множеств Group. Возвращает созданные записи."""
+        """Record the difference between two Group sets. Returns the created rows."""
         added = sorted(set(after) - set(before), key=lambda group: group.name)
         removed = sorted(set(before) - set(after), key=lambda group: group.name)
 

@@ -1,4 +1,4 @@
-"""ASGI-точка входа."""
+"""ASGI entry point."""
 
 import os
 

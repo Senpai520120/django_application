@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}Роли {{ target_user.username }} — панель{% endblock %}
+{% block title %}Roles of {{ target_user.username }} — panel{% endblock %}
 
 {% block content %}
-  <h1>Роли пользователя {{ target_user.username }}</h1>
+  <h1>Roles of user {{ target_user.username }}</h1>
 
   <form method="post" class="card form-narrow">
     {% csrf_token %}
     {{ form.as_p }}
-    <button type="submit">Сохранить</button>
-    <a href="{% url 'panel:user_list' %}">Отмена</a>
+    <button type="submit">Save</button>
+    <a href="{% url 'panel:user_list' %}">Cancel</a>
   </form>
 {% endblock %}

@@ -1,4 +1,4 @@
-"""Общие фикстуры тестов."""
+"""Fixtures shared by the test suite."""
 
 import pytest
 from django.contrib.auth.models import Group, User
@@ -15,7 +15,7 @@ def password():
 
 @pytest.fixture
 def admin_group(db):
-    """Группа admin создана data-миграцией accounts.0001_seed_groups."""
+    """The admin group is created by the accounts.0001_seed_groups migration."""
     return Group.objects.get(name=ADMIN_GROUP_NAME)
 
 
@@ -26,13 +26,13 @@ def user_group(db):
 
 @pytest.fixture
 def plain_user(db, user_group):
-    """Обычный пользователь: роль user, доступа к панели нет."""
+    """A regular user: holds the user role, has no access to the panel."""
     user = User.objects.create_user(
         username="ivan",
         password=PASSWORD,
         email="ivan@example.com",
-        first_name="Иван",
-        last_name="Иванов",
+        first_name="John",
+        last_name="Smith",
     )
     user.groups.add(user_group)
     return user
@@ -40,7 +40,7 @@ def plain_user(db, user_group):
 
 @pytest.fixture
 def group_admin(db, admin_group):
-    """Админ по группе admin — без is_staff и без суперправ."""
+    """Admin through the admin group, with neither is_staff nor superuser."""
     user = User.objects.create_user(
         username="boss",
         password=PASSWORD,
@@ -52,7 +52,7 @@ def group_admin(db, admin_group):
 
 @pytest.fixture
 def staff_admin(db):
-    """Админ по флагу is_staff."""
+    """Admin through the is_staff flag."""
     return User.objects.create_user(
         username="stafferson",
         password=PASSWORD,
