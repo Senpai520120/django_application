@@ -1,43 +1,104 @@
 # pre-commit install installs the hooks, pre-commit run --all-files runs them.
+#
+# Every hook below is local and calls its tool as `python -m <module>`. The usual
+# `repo:` form runs tools through the small .exe launchers pip generates at
+# install time: those are unsigned and unique to each machine, so Windows Smart
+# App Control and similar application-control policies block them while leaving
+# the signed python.exe alone. Going through the module skips the launcher
+# entirely. The tools themselves come from requirements-dev.txt, so their
+# versions live in one place and Dependabot already keeps that file up to date.
+#
+# The trade-off: these hooks need the project venv active, exactly like the two
+# manage.py hooks at the bottom have always needed it.
 default_language_version:
   python: python3
 
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
-    hooks:
-      - id: check-added-large-files
-      - id: check-case-conflict
-      - id: check-merge-conflict
-      - id: check-toml
-      - id: check-yaml
-      - id: debug-statements
-      - id: detect-private-key
-      - id: end-of-file-fixer
-      - id: mixed-line-ending
-        args: [--fix=lf]
-      - id: trailing-whitespace
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.4
-    hooks:
-      - id: ruff-check
-        args: [--fix]
-
-  - repo: https://github.com/psf/black
-    rev: 26.5.1
-    hooks:
-      - id: black
-
-  # These take python from the activated venv.
   - repo: local
     hooks:
+      - id: check-added-large-files
+        name: check for added large files
+        entry: python -m pre_commit_hooks.check_added_large_files
+        language: system
+        types: [file]
+
+      - id: check-case-conflict
+        name: check for case conflicts
+        entry: python -m pre_commit_hooks.check_case_conflict
+        language: system
+        types: [file]
+
+      - id: check-merge-conflict
+        name: check for merge conflicts
+        entry: python -m pre_commit_hooks.check_merge_conflict
+        language: system
+        types: [text]
+
+      - id: check-toml
+        name: check toml
+        entry: python -m pre_commit_hooks.check_toml
+        language: system
+        types: [toml]
+
+      - id: check-yaml
+        name: check yaml
+        entry: python -m pre_commit_hooks.check_yaml
+        language: system
+        types: [yaml]
+
+      - id: debug-statements
+        name: debug statements (python)
+        entry: python -m pre_commit_hooks.debug_statement_hook
+        language: system
+        types: [python]
+
+      - id: detect-private-key
+        name: detect private key
+        entry: python -m pre_commit_hooks.detect_private_key
+        language: system
+        types: [text]
+
+      - id: end-of-file-fixer
+        name: fix end of files
+        entry: python -m pre_commit_hooks.end_of_file_fixer
+        language: system
+        types: [text]
+
+      - id: mixed-line-ending
+        name: mixed line ending
+        entry: python -m pre_commit_hooks.mixed_line_ending
+        language: system
+        types: [text]
+        args: [--fix=lf]
+
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+        entry: python -m pre_commit_hooks.trailing_whitespace_fixer
+        language: system
+        types: [text]
+
+      - id: ruff-check
+        name: ruff check
+        entry: python -m ruff check --force-exclude --fix
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      - id: black
+        name: black
+        entry: python -m black
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      # These two have always taken python from the activated venv.
       - id: django-check
         name: manage.py check
         entry: python manage.py check
         language: system
         pass_filenames: false
         types: [python]
+
       - id: missing-migrations
         name: manage.py makemigrations --check
         entry: python manage.py makemigrations --check --dry-run
