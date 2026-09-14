@@ -10,7 +10,7 @@
     "codegen": "playwright codegen $BASE_URL"
   },
   "devDependencies": {
-    "@playwright/test": "^1.49.0",
-    "@types/node": "^22.10.0"
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.5.1"
   }
 }
