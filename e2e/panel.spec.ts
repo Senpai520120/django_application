@@ -1,61 +1,62 @@
 import { expect, test, uniqueName } from "./support/fixtures";
 
 /**
- * Панель администратора в браузере.
+ * The admin panel in a browser.
  *
- * Роли и активность проверяются на демо-пользователе `demo_user`, поэтому
- * каждый тест возвращает его в исходное состояние — набор ролей `["user"]`
- * и активный аккаунт. Прогоны идут в один поток, так что состояние не гонится.
+ * Roles and activity are exercised on the `demo_user` demo account, so
+ * every test puts it back into the original state: the role set
+ * `["user"]` and an active account. Runs are single-threaded, so the
+ * state never races.
  */
 const TARGET = "demo_user";
 
-test.describe("Панель: роли", () => {
+test.describe("Panel: roles", () => {
   test.afterEach(async ({ panel }) => {
     await panel.setRoles(TARGET, ["user"]);
   });
 
-  test("админ назначает роль и она появляется в списке", async ({ panel }) => {
-    await test.step("исходно у пользователя только роль user", async () => {
+  test("an admin grants a role and it shows up in the list", async ({ panel }) => {
+    await test.step("the user starts with the user role only", async () => {
       await panel.goto(TARGET);
       await expect(panel.roleBadge(TARGET, "user")).toBeVisible();
       await expect(panel.roleBadge(TARGET, "admin")).toHaveCount(0);
     });
 
-    await test.step("отмечаем роль admin и сохраняем", async () => {
+    await test.step("tick the admin role and save", async () => {
       await panel.openRoles(TARGET);
       await panel.roleCheckbox("admin").check();
       await panel.saveRoles();
     });
 
-    await test.step("роль видна в строке пользователя", async () => {
-      await expect(panel.status).toContainText("обновлены");
+    await test.step("the role is visible in the user row", async () => {
+      await expect(panel.status).toContainText("updated");
       await expect(panel.roleBadge(TARGET, "admin")).toBeVisible();
       await expect(panel.roleBadge(TARGET, "user")).toBeVisible();
     });
   });
 
-  test("админ снимает роль и она исчезает из списка", async ({ panel }) => {
-    await test.step("снимаем единственную роль", async () => {
+  test("an admin revokes a role and it disappears from the list", async ({ panel }) => {
+    await test.step("revoke the only role", async () => {
       await panel.openRoles(TARGET);
       await panel.roleCheckbox("user").uncheck();
       await panel.saveRoles();
     });
 
-    await test.step("бейджа роли больше нет", async () => {
-      await expect(panel.status).toContainText("обновлены");
+    await test.step("the role badge is gone", async () => {
+      await expect(panel.status).toContainText("updated");
       await expect(panel.roleBadge(TARGET, "user")).toHaveCount(0);
     });
   });
 
-  test("отмена на форме ролей ничего не меняет", async ({ panel }) => {
+  test("cancelling the roles form changes nothing", async ({ panel }) => {
     await panel.openRoles(TARGET);
 
-    await test.step("отмечаем admin, но уходим по «Отмена»", async () => {
+    await test.step("tick admin but leave through Cancel", async () => {
       await panel.roleCheckbox("admin").check();
       await panel.cancelRoles();
     });
 
-    await test.step("роли остались прежними", async () => {
+    await test.step("the roles are unchanged", async () => {
       await expect(panel.heading).toBeVisible();
       await panel.goto(TARGET);
       await expect(panel.roleBadge(TARGET, "admin")).toHaveCount(0);
@@ -63,17 +64,17 @@ test.describe("Панель: роли", () => {
     });
   });
 
-  test("админ не может снять роль admin с самого себя", async ({ panel }) => {
+  test("an admin cannot strip the admin role from themselves", async ({ panel }) => {
     await panel.openRoles("demo_admin");
 
-    await test.step("пробуем убрать у себя единственную админскую роль", async () => {
+    await test.step("try to remove our own only admin role", async () => {
       await panel.roleCheckbox("admin").uncheck();
       await panel.saveRoles();
     });
 
-    await test.step("форма отказывает и объясняет причину", async () => {
+    await test.step("the form refuses and explains why", async () => {
       await expect(
-        panel.page.getByText("Нельзя снять с себя роль admin"),
+        panel.page.getByText("You cannot take the admin role from yourself"),
       ).toBeVisible();
     });
 
@@ -83,9 +84,9 @@ test.describe("Панель: роли", () => {
   });
 });
 
-test.describe("Панель: активность", () => {
-  // В CI у тестов есть ретраи: если прогон упадёт между отключением и включением
-  // обратно, пользователь должен вернуться в активное состояние сам.
+test.describe("Panel: activity", () => {
+  // Tests are retried in CI: if a run dies between switching the user off
+  // and back on, the account has to return to the active state by itself.
   test.afterEach(async ({ panel }) => {
     await panel.goto(TARGET);
     if (!(await panel.isActive(TARGET))) {
@@ -93,35 +94,35 @@ test.describe("Панель: активность", () => {
     }
   });
 
-  test("деактивация и обратная активация пользователя", async ({ panel }) => {
+  test("deactivating a user and switching them back on", async ({ panel }) => {
     await panel.goto(TARGET);
     expect(await panel.isActive(TARGET)).toBe(true);
 
-    await test.step("отключаем пользователя", async () => {
+    await test.step("switch the user off", async () => {
       await panel.toggleActive(TARGET);
 
-      await expect(panel.status).toContainText("деактивирован");
-      await expect(panel.toggleButton(TARGET)).toHaveText("Активировать");
+      await expect(panel.status).toContainText("disabled");
+      await expect(panel.toggleButton(TARGET)).toHaveText("Activate");
     });
 
-    await test.step("включаем обратно", async () => {
+    await test.step("switch them back on", async () => {
       await panel.toggleActive(TARGET);
 
-      await expect(panel.status).toContainText("активирован");
-      await expect(panel.toggleButton(TARGET)).toHaveText("Деактивировать");
+      await expect(panel.status).toContainText("enabled");
+      await expect(panel.toggleButton(TARGET)).toHaveText("Deactivate");
     });
   });
 });
 
-test.describe("Панель: аудит и счётчики", () => {
+test.describe("Panel: audit log and counters", () => {
   test.afterEach(async ({ panel }) => {
     await panel.setRoles(TARGET, ["user"]);
   });
 
-  test("выдача и снятие роли попадают в журнал аудита", async ({ panel }) => {
+  test("granting and revoking a role both land in the audit log", async ({ panel }) => {
     await panel.setRoles(TARGET, ["admin", "user"]);
 
-    await test.step("верхняя запись журнала: кто, что сделал, с какой ролью и кому", async () => {
+    await test.step("the top log row: who did what, with which role, to whom", async () => {
       await panel.gotoAudit();
       const row = panel.lastAuditRow;
 
@@ -129,34 +130,34 @@ test.describe("Панель: аудит и счётчики", () => {
         row.getByRole("cell", { name: "demo_admin", exact: true }),
       ).toBeVisible();
       await expect(
-        row.getByRole("cell", { name: "назначена", exact: true }),
+        row.getByRole("cell", { name: "granted", exact: true }),
       ).toBeVisible();
       await expect(row.getByRole("cell", { name: "admin", exact: true })).toBeVisible();
       await expect(row.getByRole("cell", { name: TARGET, exact: true })).toBeVisible();
     });
 
-    await test.step("снятие роли пишется отдельной записью", async () => {
+    await test.step("revoking a role is written as its own record", async () => {
       await panel.setRoles(TARGET, ["user"]);
       await panel.gotoAudit();
       const row = panel.lastAuditRow;
 
-      await expect(row.getByRole("cell", { name: "снята", exact: true })).toBeVisible();
+      await expect(row.getByRole("cell", { name: "revoked", exact: true })).toBeVisible();
       await expect(row.getByRole("cell", { name: "admin", exact: true })).toBeVisible();
       await expect(row.getByRole("cell", { name: TARGET, exact: true })).toBeVisible();
     });
   });
 
-  test("счётчик на странице «Роли» идёт за выдачей роли", async ({ panel }) => {
+  test("the counter on the Roles page follows a granted role", async ({ panel }) => {
     await panel.gotoRoles();
     const before = await panel.roleMembers("admin");
 
-    await test.step("после выдачи в роли admin на одного больше", async () => {
+    await test.step("after granting, the admin role holds one more member", async () => {
       await panel.setRoles(TARGET, ["admin", "user"]);
       await panel.gotoRoles();
       await expect(panel.roleMembersCell("admin")).toHaveText(String(before + 1));
     });
 
-    await test.step("после снятия счётчик возвращается", async () => {
+    await test.step("after revoking, the counter comes back", async () => {
       await panel.setRoles(TARGET, ["user"]);
       await panel.gotoRoles();
       await expect(panel.roleMembersCell("admin")).toHaveText(String(before));
@@ -164,10 +165,10 @@ test.describe("Панель: аудит и счётчики", () => {
   });
 });
 
-test.describe("Панель: создание пользователя", () => {
-  test("админ заводит пользователя и сразу выдаёт роль", async ({ panel }) => {
-    // Удалять пользователей панель не умеет намеренно, поэтому уникальное имя —
-    // единственный способ сделать тест повторяемым.
+test.describe("Panel: creating a user", () => {
+  test("an admin creates a user and grants a role right away", async ({ panel }) => {
+    // The panel deliberately cannot delete users, so a unique name is the
+    // only way to keep this test repeatable.
     const username = uniqueName("e2e").replace(/-/g, "_");
 
     await panel.openCreateUser();
@@ -179,29 +180,29 @@ test.describe("Панель: создание пользователя", () => {
     });
     await panel.submitNewUser();
 
-    await test.step("пользователь появился в списке с выданной ролью", async () => {
-      await expect(panel.status).toContainText("создан");
+    await test.step("the user shows up in the list with the granted role", async () => {
+      await expect(panel.status).toContainText("created");
       await panel.search(username);
       await expect(panel.row(username)).toBeVisible();
       await expect(panel.roleBadge(username, "user")).toBeVisible();
     });
   });
 
-  test("слишком простой пароль не принимается", async ({ panel }) => {
+  test("a password that is too simple is refused", async ({ panel }) => {
     const username = uniqueName("weak").replace(/-/g, "_");
 
     await panel.openCreateUser();
     await panel.fillNewUser({ username, password: "52012000" });
     await panel.submitNewUser();
 
-    await test.step("форма объясняет, что не так, и пользователя не создаёт", async () => {
+    await test.step("the form explains the problem and creates no user", async () => {
       await expect(
-        panel.page.getByText("Введённый пароль состоит только из цифр"),
+        panel.page.getByText("This password is entirely numeric"),
       ).toBeVisible();
 
-      // После отказа мы всё ещё на форме, поэтому за списком идём по адресу.
+      // After the refusal we are still on the form, so reach the list by URL.
       await panel.goto(username);
-      await expect(panel.page.getByText("Ничего не найдено")).toBeVisible();
+      await expect(panel.page.getByText("Nothing found")).toBeVisible();
       await expect(panel.row(username)).toHaveCount(0);
     });
   });

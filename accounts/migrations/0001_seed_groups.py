@@ -1,7 +1,7 @@
-"""Базовые роли admin и user.
+"""Baseline admin and user roles.
 
-Имена захардкожены: миграция описывает прошлое и не должна меняться
-вслед за константами в коде.
+The names are hardcoded on purpose: a migration describes the past and must
+not drift along with constants that live in the code.
 """
 
 from django.db import migrations

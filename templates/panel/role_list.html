@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}Роли — панель{% endblock %}
+{% block title %}Roles — panel{% endblock %}
 
 {% block content %}
-  <h1>Роли</h1>
-  <p class="hint">Роль — это встроенная группа Django (<code>auth.Group</code>).</p>
+  <h1>Roles</h1>
+  <p class="hint">A role is a built-in Django group (<code>auth.Group</code>).</p>
 
   <table>
     <thead>
-      <tr><th>Роль</th><th>Пользователей</th></tr>
+      <tr><th>Role</th><th>Users</th></tr>
     </thead>
     <tbody>
       {% for role in roles %}
@@ -17,7 +17,7 @@
           <td>{{ role.members_count }}</td>
         </tr>
       {% empty %}
-        <tr><td colspan="2"><em>Ролей нет. Запустите <code>manage.py seed_groups</code>.</em></td></tr>
+        <tr><td colspan="2"><em>No roles yet. Run <code>manage.py seed_groups</code>.</em></td></tr>
       {% endfor %}
     </tbody>
   </table>

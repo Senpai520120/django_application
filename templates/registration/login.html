@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}Вход — Users &amp; Roles{% endblock %}
+{% block title %}Sign in — Users &amp; Roles{% endblock %}
 
 {% block content %}
-  <h1>Вход</h1>
+  <h1>Sign in</h1>
 
   <form method="post" class="card form-narrow">
     {% csrf_token %}
@@ -25,6 +25,6 @@
     {% endfor %}
 
     <input type="hidden" name="next" value="{{ next }}">
-    <button type="submit">Войти</button>
+    <button type="submit">Sign in</button>
   </form>
 {% endblock %}

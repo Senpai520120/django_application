@@ -1,4 +1,4 @@
-"""Назначение и снятие ролей через панель."""
+"""Granting and revoking roles through the panel."""
 
 from urllib.parse import quote
 
@@ -89,7 +89,7 @@ def test_plain_user_cannot_change_roles(client, plain_user, admin_group):
 
 @pytest.mark.django_db
 def test_post_without_csrf_token_is_rejected(group_admin, plain_user, admin_group):
-    """CSRF-защита включена и не отключается в проекте."""
+    """CSRF protection is on and is not disabled anywhere in the project."""
     csrf_client = Client(enforce_csrf_checks=True)
     csrf_client.force_login(group_admin)
 
@@ -104,7 +104,7 @@ def test_post_without_csrf_token_is_rejected(group_admin, plain_user, admin_grou
 
 @pytest.mark.django_db
 def test_admin_cannot_take_admin_role_from_himself(client, group_admin, admin_group):
-    """Иначе последний админ закрывает панель сам себе и лечится только shell."""
+    """Otherwise the last admin locks themselves out and only a shell helps."""
     client.force_login(group_admin)
 
     response = client.post(
@@ -119,7 +119,7 @@ def test_admin_cannot_take_admin_role_from_himself(client, group_admin, admin_gr
 
 @pytest.mark.django_db
 def test_superuser_may_drop_own_group(client, superuser, admin_group):
-    """Запрет точечный: суперюзер не теряет доступ, снимая группу."""
+    """The ban is narrow: a superuser keeps access after dropping the group."""
     superuser.groups.add(admin_group)
     client.force_login(superuser)
 
@@ -156,7 +156,7 @@ def test_after_saving_roles_admin_returns_to_the_same_list_page(
 ):
     client.force_login(group_admin)
     back = f"{reverse('panel:user_list')}?q=ivan&page=1"
-    # Шаблон кладёт адрес в ?next= через фильтр urlencode.
+    # The template puts the address into ?next= through the urlencode filter.
     next_param = quote(back, safe="/")
 
     response = client.post(

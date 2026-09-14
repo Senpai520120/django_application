@@ -7,7 +7,7 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Новый пуш в ветку отменяет предыдущий незавершённый прогон.
+# A new push to a branch cancels the previous unfinished run.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -17,13 +17,13 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.12"
-  # Длина >= 50 символов: иначе check --deploy ругается (security.W009).
+  # At least 50 characters, otherwise check --deploy complains (security.W009).
   SECRET_KEY: ci-secret-key-not-for-production-0123456789-abcdefghij
   DEBUG: "False"
 
 jobs:
   lint:
-    name: Линтеры
+    name: Linters
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,11 +41,11 @@ jobs:
       - name: black
         run: black --check --diff .
 
-      - name: pre-commit (те же хуки, что и локально)
+      - name: pre-commit (the same hooks as locally)
         uses: pre-commit/action@v3.0.1
 
   django-checks:
-    name: Проверки Django
+    name: Django checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -60,10 +60,10 @@ jobs:
       - name: manage.py check
         run: python manage.py check
 
-      - name: Забытые миграции
+      - name: Missing migrations
         run: python manage.py makemigrations --check --dry-run
 
-      - name: Аудит прод-настроек (как за HTTPS)
+      - name: Production settings audit (as if behind HTTPS)
         env:
           SESSION_COOKIE_SECURE: "True"
           CSRF_COOKIE_SECURE: "True"
@@ -74,7 +74,7 @@ jobs:
         run: python manage.py check --deploy --fail-level WARNING
 
   test:
-    name: Тесты (Python ${{ matrix.python-version }}, PostgreSQL)
+    name: Tests (Python ${{ matrix.python-version }}, PostgreSQL)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -106,13 +106,13 @@ jobs:
 
       - run: pip install -r requirements-dev.txt
 
-      - name: Миграции на чистой БД
+      - name: Migrations on a clean database
         run: python manage.py migrate --noinput
 
-      - name: pytest + покрытие
+      - name: pytest with coverage
         run: pytest --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=90
 
-      - name: Сохранить отчёт о покрытии
+      - name: Upload the coverage report
         if: matrix.python-version == '3.12'
         uses: actions/upload-artifact@v4
         with:
@@ -121,40 +121,40 @@ jobs:
           if-no-files-found: error
 
   compose-smoke:
-    name: docker compose up + HTTP-проверка
+    name: docker compose up plus an HTTP check
     runs-on: ubuntu-latest
     needs: [lint, django-checks, test]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Подготовить .env
+      - name: Prepare .env
         run: |
           cp .env.example .env
           KEY=$(python -c "import secrets; print(secrets.token_urlsafe(64))")
           sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$KEY|" .env
 
-      - name: Поднять стек
+      - name: Start the stack
         run: docker compose up -d --build
 
-      - name: Дождаться приложения
+      - name: Wait for the app
         run: |
           for _ in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/login/ || true)
-            if [ "$code" = "200" ]; then echo "приложение отвечает"; exit 0; fi
+            if [ "$code" = "200" ]; then echo "the app answers"; exit 0; fi
             sleep 2
           done
-          echo "приложение не поднялось, последний код: $code"
+          echo "the app never came up, last code: $code"
           exit 1
 
-      - name: Роли засеяны, доступ закрыт для анонима
+      - name: Roles are seeded and anonymous access is closed
         run: |
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/manage/)" = "302"
           docker compose exec -T web python manage.py shell -c "
           names = sorted(Group.objects.values_list('name', flat=True))
           assert names == ['admin', 'user'], names
-          print('роли в БД:', names)"
+          print('roles in the database:', names)"
 
-      - name: Тестовые данные засеяны, вход админом работает
+      - name: Demo data is seeded and an admin can sign in
         run: |
           curl -s -c /tmp/cj -o /dev/null http://127.0.0.1:8000/login/
           CSRF=$(awk '$6 == "csrftoken" {print $7}' /tmp/cj)
@@ -164,11 +164,11 @@ jobs:
           test "$(curl -s -b /tmp/cj -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/files/)" = "200"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/files/)" = "302"
 
-      - name: Логи контейнеров
+      - name: Container logs
         if: failure()
         run: docker compose logs
 
-      - name: Погасить стек
+      - name: Shut the stack down
         if: always()
         run: docker compose down -v
 
@@ -179,23 +179,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Подготовить .env
+      - name: Prepare .env
         run: |
           cp .env.example .env
           KEY=$(python -c "import secrets; print(secrets.token_urlsafe(64))")
           sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$KEY|" .env
 
-      - name: Поднять стек
+      - name: Start the stack
         run: docker compose up -d --build
 
-      - name: Дождаться приложения
+      - name: Wait for the app
         run: |
           for _ in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/login/ || true)
             if [ "$code" = "200" ]; then exit 0; fi
             sleep 2
           done
-          echo "приложение не поднялось"
+          echo "the app never came up"
           exit 1
 
       - uses: actions/setup-node@v4
@@ -204,22 +204,22 @@ jobs:
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
-      - name: Установить Playwright
+      - name: Install Playwright
         working-directory: e2e
         run: |
           npm ci
           npx playwright install --with-deps chromium
 
-      - name: Прогнать E2E (локальное хранилище)
+      - name: Run E2E (local storage)
         working-directory: e2e
         env:
           BASE_URL: http://127.0.0.1:8000
           E2E_MAX_FILE_SIZE: "5242880"
         run: npx playwright test
 
-      # Тот же набор сценариев против S3-режима. Реального AWS не нужно:
-      # роль бакета играет localstack из профиля s3 в docker-compose.
-      - name: Перезапустить стек в S3-режиме
+      # The same set of scenarios against S3 mode. No real AWS needed: the
+      # bucket is played by localstack from the s3 profile in docker-compose.
+      - name: Restart the stack in S3 mode
         env:
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test
@@ -251,17 +251,17 @@ jobs:
             if [ "$code" = "200" ]; then exit 0; fi
             sleep 2
           done
-          echo "приложение в S3-режиме не поднялось"
+          echo "the app never came up in S3 mode"
           exit 1
 
-      - name: Прогнать E2E (S3 через localstack)
+      - name: Run E2E (S3 through localstack)
         working-directory: e2e
         env:
           BASE_URL: http://127.0.0.1:8000
           E2E_MAX_FILE_SIZE: "5242880"
         run: npx playwright test
 
-      - name: Отчёт Playwright
+      - name: Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -269,16 +269,16 @@ jobs:
           path: e2e/playwright-report/
           retention-days: 7
 
-      - name: Логи контейнеров
+      - name: Container logs
         if: failure()
         run: docker compose logs
 
-      - name: Погасить стек
+      - name: Shut the stack down
         if: always()
         run: docker compose down -v
 
   publish:
-    name: Публикация образа в GHCR
+    name: Publish the image to GHCR
     runs-on: ubuntu-latest
     needs: [compose-smoke, e2e]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))

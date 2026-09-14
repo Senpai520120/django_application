@@ -1,4 +1,4 @@
-"""Контроль доступа к панели /manage/."""
+"""Access control for the /manage/ panel."""
 
 import pytest
 from django.urls import reverse
@@ -67,7 +67,7 @@ def test_superuser_gets_200(client, superuser):
 
 @pytest.mark.django_db
 def test_losing_admin_group_closes_the_panel(client, group_admin, admin_group):
-    """Права проверяются на каждый запрос, а не один раз при логине."""
+    """Permissions are checked on every request, not once at login."""
     client.force_login(group_admin)
     assert client.get(reverse("panel:user_list")).status_code == 200
 
@@ -87,7 +87,7 @@ def test_admin_sees_panel_link_on_home(client, group_admin):
 
 @pytest.mark.django_db
 def test_permission_check_costs_one_query(client, group_admin):
-    """Проверку зовут и миксин, и контекст-процессор — запрос должен быть один."""
+    """Both the mixin and the context processor ask, but one query must suffice."""
     from django.db import connection
     from django.test.utils import CaptureQueriesContext
 

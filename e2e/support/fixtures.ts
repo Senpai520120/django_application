@@ -3,13 +3,13 @@ import { test as base, expect, type Page } from "@playwright/test";
 import { FileManagerPage } from "./file-manager.page";
 import { PanelPage } from "./panel.page";
 
-/** Учётка берётся из окружения: в CI это demo-пользователь из seed_demo_users. */
+/** Credentials come from the environment; in CI it is a seed_demo_users account. */
 export const credentials = {
   username: process.env.E2E_USERNAME ?? "demo_admin",
   password: process.env.E2E_PASSWORD ?? "demo-password-123",
 };
 
-/** Уникальное имя на каждый прогон: тесты не мешают друг другу и повторяемы. */
+/** A unique name per run, so tests never collide and stay repeatable. */
 export function uniqueName(prefix: string): string {
   const stamp = Date.now().toString(36);
   const random = Math.random().toString(36).slice(2, 7);
@@ -18,18 +18,18 @@ export function uniqueName(prefix: string): string {
 
 export async function login(page: Page): Promise<void> {
   await page.goto("/login/");
-  await page.getByLabel("Имя пользователя").fill(credentials.username);
-  await page.getByLabel("Пароль").fill(credentials.password);
-  await page.getByRole("button", { name: "Войти" }).click();
-  await expect(page.getByRole("heading", { name: /Вы вошли как/ })).toBeVisible();
+  await page.getByLabel("Username").fill(credentials.username);
+  await page.getByLabel("Password").fill(credentials.password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("heading", { name: /You are signed in as/ })).toBeVisible();
 }
 
 type Fixtures = {
-  /** Файловый менеджер под залогиненным пользователем. */
+  /** File manager under a signed-in user. */
   fileManager: FileManagerPage;
-  /** Панель администратора под залогиненным админом. */
+  /** Admin panel under a signed-in admin. */
   panel: PanelPage;
-  /** Пустая папка под конкретный тест, которая убирается за собой. */
+  /** An empty folder for one test that cleans up after itself. */
   workspace: string;
 };
 
@@ -49,7 +49,7 @@ export const test = base.extend<Fixtures>({
   },
 
   workspace: async ({ fileManager }, use, testInfo) => {
-    const folder = uniqueName(testInfo.title.replace(/[^a-zA-Zа-яА-Я0-9]+/g, "-"));
+    const folder = uniqueName(testInfo.title.replace(/[^a-zA-Z0-9]+/g, "-"));
 
     await fileManager.goto();
     await fileManager.createFolder(folder);

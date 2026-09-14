@@ -1,7 +1,7 @@
 [project]
 name = "users-and-roles"
 version = "0.1.0"
-description = "Django-приложение: пользователи, роли и кастомная админка на /manage/"
+description = "Django app: users, roles and a custom admin panel at /manage/"
 requires-python = ">=3.11"
 
 [tool.black]
@@ -27,7 +27,7 @@ DJANGO_SETTINGS_MODULE = "config.settings_test"
 python_files = ["test_*.py"]
 testpaths = ["tests"]
 addopts = "-q"
-# whitenoise ворчит про отсутствующий STATIC_ROOT: в тестах collectstatic не нужен.
+# whitenoise grumbles about a missing STATIC_ROOT; tests need no collectstatic.
 filterwarnings = ["ignore:No directory at:UserWarning"]
 
 [tool.coverage.run]

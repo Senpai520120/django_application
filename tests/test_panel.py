@@ -1,4 +1,4 @@
-"""Список пользователей, поиск, пагинация и прочие возможности панели."""
+"""User list, search, pagination and the rest of the panel."""
 
 import pytest
 from django.contrib.auth.models import User
@@ -16,7 +16,7 @@ def test_user_list_shows_users_with_roles(client, group_admin, plain_user):
 
     assert list(response.context["users"]) == [group_admin, plain_user]
     assert plain_user.email in content
-    # Именно бейдж роли, а не слово "user", которое есть в разметке всегда.
+    # The role badge specifically, not the word "user" that markup always has.
     assert '<span class="badge">user</span>' in content
 
 
@@ -50,7 +50,7 @@ def test_user_list_is_paginated(client, group_admin):
 
     assert first_page.context["is_paginated"] is True
     assert len(first_page.context["users"]) == 10
-    assert len(second_page.context["users"]) == 6  # 15 созданных + сам админ
+    assert len(second_page.context["users"]) == 6  # 15 created plus the admin
 
 
 @pytest.mark.django_db
@@ -95,8 +95,8 @@ def test_admin_creates_user_with_role(client, group_admin, user_group, password)
         {
             "username": "newbie",
             "email": "newbie@example.com",
-            "first_name": "Пётр",
-            "last_name": "Петров",
+            "first_name": "Peter",
+            "last_name": "Parker",
             "password1": password,
             "password2": password,
             "groups": [user_group.pk],
@@ -131,7 +131,7 @@ def test_audit_log_page_lists_changes(client, group_admin, plain_user, admin_gro
 
 @pytest.mark.django_db
 def test_user_list_has_no_n_plus_one(client, group_admin, django_assert_num_queries):
-    """Число запросов не должно расти вместе с числом пользователей."""
+    """The query count must not grow along with the number of users."""
     client.force_login(group_admin)
     url = reverse("panel:user_list")
 

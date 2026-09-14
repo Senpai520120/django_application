@@ -1,4 +1,4 @@
-"""Нормализация путей и имён — первая линия защиты от path traversal."""
+"""Path and name normalisation: the first line of defence against traversal."""
 
 import pytest
 from django.core.exceptions import SuspiciousFileOperation
@@ -42,7 +42,7 @@ def test_traversal_is_rejected(path):
         ("./", ""),
         ("docs", "docs"),
         ("docs/", "docs"),
-        ("/docs", None),  # проверяется отдельно ниже
+        ("/docs", None),  # checked separately below
     ],
 )
 def test_normalize_path_simple_cases(raw, expected):

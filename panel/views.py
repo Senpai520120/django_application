@@ -1,4 +1,4 @@
-"""Вьюхи панели /manage/."""
+"""Views of the /manage/ panel."""
 
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
@@ -18,7 +18,7 @@ from panel.models import RoleChange
 
 
 def safe_next(request):
-    """Адрес возврата из ?next=, если он ведёт на этот же сайт."""
+    """Return address from ?next=, but only when it points back at this site."""
     next_url = request.POST.get("next") or request.GET.get("next", "")
     if next_url and url_has_allowed_host_and_scheme(
         next_url,
@@ -30,7 +30,7 @@ def safe_next(request):
 
 
 class UserListView(AdminRequiredMixin, ListView):
-    """Поиск по ?q= и пагинация."""
+    """Search through ?q= plus pagination."""
 
     template_name = "panel/user_list.html"
     context_object_name = "users"
@@ -71,7 +71,7 @@ class UserRolesUpdateView(AdminRequiredMixin, UpdateView):
         target = super().get_object(queryset)
         if target.is_superuser and not self.request.user.is_superuser:
             raise PermissionDenied(
-                _("Роли суперпользователя может менять только суперпользователь.")
+                _("Only a superuser may change the roles of a superuser.")
             )
         return target
 
@@ -81,7 +81,7 @@ class UserRolesUpdateView(AdminRequiredMixin, UpdateView):
         return kwargs
 
     def get_success_url(self):
-        """Вернуться туда, откуда пришли: список мог быть с поиском и страницей."""
+        """Go back where we came from: the list may have had a query and a page."""
         return safe_next(self.request) or str(self.success_url)
 
     @transaction.atomic
@@ -99,13 +99,13 @@ class UserRolesUpdateView(AdminRequiredMixin, UpdateView):
         if changes:
             messages.success(
                 self.request,
-                _("Роли пользователя %(username)s обновлены (изменений: %(count)s).")
+                _("Roles of %(username)s updated (changes: %(count)s).")
                 % {"username": self.object.username, "count": len(changes)},
             )
         else:
             messages.info(
                 self.request,
-                _("Роли пользователя %(username)s не изменились.")
+                _("Roles of %(username)s are unchanged.")
                 % {"username": self.object.username},
             )
         return response
@@ -128,7 +128,7 @@ class UserCreateView(AdminRequiredMixin, CreateView):
         )
         messages.success(
             self.request,
-            _("Пользователь %(username)s создан.") % {"username": self.object.username},
+            _("User %(username)s created.") % {"username": self.object.username},
         )
         return response
 
@@ -137,19 +137,17 @@ class UserToggleActiveView(AdminRequiredMixin, View):
     def post(self, request, pk):
         target = get_object_or_404(User, pk=pk)
         if target.is_superuser and not request.user.is_superuser:
-            raise PermissionDenied(
-                _("Суперпользователя может отключить только суперпользователь.")
-            )
+            raise PermissionDenied(_("Only a superuser may switch off a superuser."))
 
         if target == request.user:
-            messages.error(request, _("Нельзя деактивировать самого себя."))
+            messages.error(request, _("You cannot switch yourself off."))
         else:
             target.is_active = not target.is_active
             target.save(update_fields=["is_active"])
-            state = _("активирован") if target.is_active else _("деактивирован")
+            state = _("enabled") if target.is_active else _("disabled")
             messages.success(
                 request,
-                _("Пользователь %(username)s %(state)s.")
+                _("User %(username)s %(state)s.")
                 % {"username": target.username, "state": state},
             )
         return redirect(safe_next(request) or "panel:user_list")

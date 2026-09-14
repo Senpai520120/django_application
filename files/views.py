@@ -1,9 +1,9 @@
-"""Вьюхи файлового менеджера.
+"""File manager views.
 
-Вьюхи не знают, где лежат файлы: всё общение с хранилищем идёт через
-`files.storage.get_storage()`. Некорректный путь превращается в
-`SuspiciousFileOperation`, а Django сам отвечает на него 400 — ловить его
-здесь не нужно.
+The views do not know where the files live: every conversation with the storage
+goes through `files.storage.get_storage()`. A malformed path turns into
+`SuspiciousFileOperation`, which Django answers with 400 on its own, so there
+is nothing to catch here.
 """
 
 from django.conf import settings
@@ -25,13 +25,13 @@ from files.storage import StorageError, get_storage
 
 
 def browse_url(path: str = "") -> str:
-    """Ссылка на список содержимого папки."""
+    """Link to the listing of a folder."""
     url = reverse("files:browse")
     return f"{url}?{urlencode({'path': path})}" if path else url
 
 
 class FileManagerMixin(FileManagerAccessMixin):
-    """Хранилище и текущий путь — общие для всех вьюх раздела."""
+    """Storage and current path, shared by every view of the section."""
 
     @cached_property
     def storage(self):
@@ -82,7 +82,7 @@ class FolderCreateView(FileManagerMixin, FormView):
         else:
             messages.success(
                 self.request,
-                _("Папка «%(name)s» создана.") % {"name": form.cleaned_data["name"]},
+                _("Folder %(name)s created.") % {"name": form.cleaned_data["name"]},
             )
         return self.redirect_to(form.cleaned_data["path"])
 
@@ -107,7 +107,7 @@ class UploadView(FileManagerMixin, FormView):
         if self.storage.total_size() + incoming > total_limit:
             messages.error(
                 self.request,
-                _("Не хватает места: лимит хранилища %(limit)s.")
+                _("Not enough room: the storage limit is %(limit)s.")
                 % {"limit": filesizeformat(total_limit)},
             )
             return self.redirect_to(path)
@@ -127,7 +127,7 @@ class UploadView(FileManagerMixin, FormView):
 
         if saved:
             messages.success(
-                self.request, _("Загружено файлов: %(count)s.") % {"count": saved}
+                self.request, _("Uploaded files: %(count)s.") % {"count": saved}
             )
         return self.redirect_to(path)
 
@@ -150,7 +150,7 @@ class RenameView(FileManagerMixin, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         if not self.path:
-            raise Http404("Нечего переименовывать.")
+            raise Http404("Nothing to rename.")
         context.update(
             path=self.path,
             name=self.path.rsplit("/", 1)[-1],
@@ -169,7 +169,7 @@ class RenameView(FileManagerMixin, FormView):
 
         messages.success(
             self.request,
-            _("Переименовано в «%(name)s».") % {"name": form.cleaned_data["new_name"]},
+            _("Renamed to %(name)s.") % {"name": form.cleaned_data["new_name"]},
         )
         return self.redirect_to(parent_path(path))
 
@@ -180,9 +180,9 @@ class DeleteView(FileManagerMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         if not self.path:
-            raise Http404("Корень удалить нельзя.")
+            raise Http404("The root cannot be deleted.")
         if not self.storage.exists(self.path):
-            raise Http404("Файл или папка не найдены.")
+            raise Http404("File or folder not found.")
 
         context.update(
             path=self.path,
@@ -201,7 +201,7 @@ class DeleteView(FileManagerMixin, TemplateView):
         else:
             messages.success(
                 request,
-                _("Удалено: %(name)s.") % {"name": self.path.rsplit("/", 1)[-1]},
+                _("Deleted: %(name)s.") % {"name": self.path.rsplit("/", 1)[-1]},
             )
         return self.redirect_to(parent)
 
@@ -209,7 +209,7 @@ class DeleteView(FileManagerMixin, TemplateView):
 class DownloadView(FileManagerMixin, View):
     def get(self, request, *args, **kwargs):
         if not self.path or self.storage.is_dir(self.path):
-            raise Http404("Файл не найден.")
+            raise Http404("File not found.")
 
         try:
             handle = self.storage.open(self.path)
@@ -217,5 +217,6 @@ class DownloadView(FileManagerMixin, View):
             raise Http404(str(error)) from error
 
         name = self.path.rsplit("/", 1)[-1]
-        # as_attachment: даже html или exe уедут файлом, а не выполнятся в браузере.
+        # as_attachment: even html or exe leave as a download instead of
+        # being executed or rendered by the browser.
         return FileResponse(handle, as_attachment=True, filename=name)

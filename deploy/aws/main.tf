@@ -31,12 +31,12 @@ resource "random_password" "secret_key" {
 }
 
 # ---------------------------------------------------------------------------
-# S3: приватный бакет для файлового менеджера
+# S3: a private bucket for the file manager
 # ---------------------------------------------------------------------------
 
 resource "aws_s3_bucket" "files" {
   bucket        = var.bucket_name
-  force_destroy = true # чтобы terraform destroy снёс бакет вместе с файлами
+  force_destroy = true # so terraform destroy removes the bucket with its files
   tags          = local.tags
 }
 
@@ -59,7 +59,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "files" {
 }
 
 # ---------------------------------------------------------------------------
-# IAM: роль инстанса с правами только на этот бакет
+# IAM: an instance role scoped to this bucket only
 # ---------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "assume_ec2" {
@@ -106,10 +106,10 @@ resource "aws_iam_instance_profile" "app" {
 }
 
 # ---------------------------------------------------------------------------
-# Сеть и инстанс
+# Network and instance
 # ---------------------------------------------------------------------------
 
-# AWS принимает описание security group только в ASCII, поэтому оно на латинице.
+# AWS accepts a security group description in ASCII only.
 resource "aws_security_group" "app" {
   name        = "${local.name}-app"
   description = "HTTP for everyone, SSH only from the configured address"
@@ -164,8 +164,9 @@ resource "aws_instance" "app" {
     http_tokens = "required" # IMDSv2
   }
 
-  # Смена образа меняет user_data, а cloud-init отрабатывает только на первой
-  # загрузке. Без этого инстанс перезапустился бы со старым контейнером.
+  # Changing the image changes user_data, and cloud-init only runs on the
+  # first boot. Without this the instance would come back with the old
+  # container.
   user_data_replace_on_change = true
 
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {

@@ -2,7 +2,7 @@
   "name": "users-and-roles-e2e",
   "version": "1.0.0",
   "private": true,
-  "description": "E2E-тесты файлового менеджера на Playwright",
+  "description": "Playwright end-to-end tests for the panel and the file manager",
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",

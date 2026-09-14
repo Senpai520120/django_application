@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}Переименовать {{ name }}{% endblock %}
+{% block title %}Rename {{ name }}{% endblock %}
 
 {% block content %}
-  <h1>Переименовать {% if is_dir %}папку{% else %}файл{% endif %} «{{ name }}»</h1>
+  <h1>Rename {% if is_dir %}folder{% else %}file{% endif %} &laquo;{{ name }}&raquo;</h1>
 
   <form method="post" class="card form-narrow">
     {% csrf_token %}
@@ -16,7 +16,7 @@
     {% endif %}
 
     <p>
-      <label for="id_new_name">Новое имя</label>
+      <label for="id_new_name">New name</label>
       <input type="text" id="id_new_name" name="new_name" value="{{ form.new_name.value|default:name }}"
              required maxlength="120" data-testid="new-name">
       {% if form.new_name.errors %}
@@ -24,7 +24,7 @@
       {% endif %}
     </p>
 
-    <button type="submit" data-testid="rename-submit">Сохранить</button>
-    <a href="{% url 'files:browse' %}?path={{ parent|urlencode }}">Отмена</a>
+    <button type="submit" data-testid="rename-submit">Save</button>
+    <a href="{% url 'files:browse' %}?path={{ parent|urlencode }}">Cancel</a>
   </form>
 {% endblock %}

@@ -1,9 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Приложение поднимается тем же docker-compose, что и для остального проекта,
- * поэтому адрес приходит снаружи: локально — 127.0.0.1:8000, в CI — тот же
- * стек, при желании — задеплоенное в AWS окружение.
+ * The app is started by the same docker-compose as the rest of the project, so
+ * the address comes from outside: 127.0.0.1:8000 locally, the same stack in CI,
+ * and a deployed AWS environment when you want one.
  */
 const baseURL = process.env.BASE_URL ?? "http://127.0.0.1:8000";
 
@@ -12,7 +12,7 @@ export default defineConfig({
   testMatch: /.*\.spec\.ts/,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  // Локально ретраев нет: флейк должен быть виден сразу, а не прятаться.
+  // No retries locally: a flake must be visible at once instead of hiding.
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   timeout: 60_000,

@@ -1,4 +1,4 @@
-"""Кто считается админом. Роли — встроенные auth.Group."""
+"""Who counts as an admin. Roles are plain built-in auth.Group objects."""
 
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 
@@ -9,10 +9,11 @@ DEFAULT_GROUP_NAMES = (ADMIN_GROUP_NAME, USER_GROUP_NAME)
 
 
 def is_admin(user: AbstractBaseUser | AnonymousUser) -> bool:
-    """Участник группы admin, is_staff или суперпользователь.
+    """Member of the admin group, a staff member, or a superuser.
 
-    Результат кешируется на объекте пользователя: за запрос проверку зовут
-    и миксин, и контекст-процессор, а запрос к БД нужен один.
+    The answer is cached on the user object: within a single request the check
+    is called by both the mixin and the context processor, and one database
+    query is enough for both.
     """
     cached = getattr(user, "_is_panel_admin", None)
     if cached is not None:
