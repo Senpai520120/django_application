@@ -178,7 +178,7 @@ test.describe("Panel: creating a user", () => {
       email: `${username}@example.com`,
       roles: ["user"],
     });
-    await panel.submitNewUser();
+    await panel.clickCreate();
 
     await test.step("the user shows up in the list with the granted role", async () => {
       await expect(panel.status).toContainText("created");
@@ -193,7 +193,7 @@ test.describe("Panel: creating a user", () => {
 
     await panel.openCreateUser();
     await panel.fillNewUser({ username, password: "52012000" });
-    await panel.submitNewUser();
+    await panel.clickCreate();
 
     await test.step("the form explains the problem and creates no user", async () => {
       await expect(

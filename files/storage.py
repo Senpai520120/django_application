@@ -361,7 +361,7 @@ class S3FileStorage(FileManagerStorage):
         new_prefix = self._dir_prefix(new_relative)
         keys = [obj["Key"] for obj in self._iter_keys(old_prefix)]
         for key in keys:
-            self._copy(key, f"{new_prefix}{key[len(old_prefix):]}")
+            self._copy(key, f"{new_prefix}{key[len(old_prefix) :]}")
         self._delete_prefix(old_prefix)
         return new_relative
 

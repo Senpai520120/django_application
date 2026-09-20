@@ -2,7 +2,7 @@ import { expect, test, uniqueName, login, loginAs, logout } from "./support/fixt
 
 
 test.describe("<test group name>", () => {
-  
+
   test("<test case name1>", async ({ panel, audit }) => {
     // todo: test case 1 implementation
     await login(panel.page);

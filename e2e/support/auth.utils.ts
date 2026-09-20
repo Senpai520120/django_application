@@ -17,7 +17,5 @@ export class LoginUtils {
     await this.page.getByRole('button', { name: 'Sign in' }).click();
     await expect(this.page.getByRole('heading', { name: 'You are signed in as' })).toBeVisible();
   }
-  
+
 }
-
-

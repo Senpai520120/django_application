@@ -2,7 +2,7 @@ import { expect, test, uniqueName, login, loginAs, logout } from "./support/fixt
 
 
 test.describe("<test group name>", () => {
-  
+
   test("<test case name1>", async ({ panel, audit }) => {
     // todo: test case 1 implementation
     const username = "testuser_" + Math.random().toString(36).substring(2, 8);
@@ -19,7 +19,7 @@ test.describe("<test group name>", () => {
     await expect(auditRow.getByRole("cell", { name: username, exact: true })).toBeVisible();
     await expect(auditRow.getByRole("cell", { name: "granted", exact: true })).toBeVisible();
     await expect(auditRow.getByRole("cell", { name: "user", exact: true })).toBeVisible();
-    
+
   });
 
 });

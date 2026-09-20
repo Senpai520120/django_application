@@ -147,6 +147,9 @@ export class PanelPage {
   // --- creating a user ---------------------------------------------------------
 
   async openCreateUser(): Promise<void> {
+    // Like openRoles, this gets to the list itself instead of assuming the
+    // caller is already there: the panel fixture no longer navigates.
+    await this.goto();
     await this.page.getByRole("link", { name: "+ New user" }).click();
     await expect(
       this.page.getByRole("heading", { name: "New user" }),

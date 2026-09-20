@@ -53,7 +53,7 @@ class RoleChange(models.Model):
     def __str__(self):
         actor = self.actor.username if self.actor else "system"
         verb = self.get_action_display()
-        return f"{actor}: role {self.group_name} {verb} " f"for {self.target_username}"
+        return f"{actor}: role {self.group_name} {verb} for {self.target_username}"
 
     @classmethod
     def log_diff(cls, *, actor, target, before, after):
