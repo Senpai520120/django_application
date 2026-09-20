@@ -170,7 +170,7 @@ export class PanelPage {
     await this.page.getByLabel("Password confirmation").fill(data.password);
   }
 
-  async submitNewUser(): Promise<void> {
+  async clickCreate(): Promise<void> {
     await this.page.getByRole("button", { name: "Create" }).click();
   }
 }
