@@ -21,7 +21,7 @@ What is written by hand: the panel, the access control and the templates.
 | File storage | `FileSystemStorage` or S3 through django-storages, picked by an environment variable |
 | Configuration | `django-environ`, everything from the environment |
 | Tests | pytest + pytest-django, 157 tests, 95% coverage |
-| Lint | ruff + black, locally through pre-commit |
+| Lint | ruff + black, run by hand and in CI |
 | E2E | Playwright (chromium), panel and file manager scenarios |
 | CI/CD | GitHub Actions: linters → Django checks → tests → docker compose smoke → image published to GHCR |
 
@@ -51,10 +51,7 @@ python manage.py createsuperuser
 # 6. Demo users: an admin, a regular one, a deactivated one and a dozen more
 python manage.py seed_demo_users
 
-# 7. Hooks that run before a commit (ruff, black, Django checks)
-pre-commit install
-
-# 8. Run it
+# 7. Run it
 python manage.py runserver
 ```
 
@@ -199,7 +196,6 @@ Written by hand:
 | `templates/` | every template, including `registration/login.html` and 403/404/500 |
 | `config/settings.py` | settings on top of `django-environ` |
 | `config/settings_test.py` | settings for the test suite |
-| `.pre-commit-config.yaml` | linter hooks before a commit |
 | `.github/workflows/ci.yml` | the CI/CD pipeline |
 
 ## Roles and access control
@@ -401,20 +397,15 @@ black .                 # format
 black --check .         # check only, the way CI does
 ```
 
-Locally it is easier to run all of this through pre-commit, which is also
-installed as a commit hook:
+Nothing runs these for you before a commit: the project has no git hooks.
+Run them yourself, or rely on CI, which does both on every pull request.
+
+Two more checks worth running before pushing, because CI runs them too:
 
 ```bash
-pre-commit install          # once after cloning
-pre-commit run --all-files  # run across the whole repository
-pre-commit autoupdate       # update hook versions
+python manage.py check
+python manage.py makemigrations --check --dry-run   # catches forgotten migrations
 ```
-
-The hooks: basic file hygiene (end of file, whitespace, large files, private
-keys, valid YAML and TOML), `ruff --fix`, `black`, plus two local ones —
-`manage.py check` and `makemigrations --check`, which catches forgotten
-migrations. The local hooks call `python` from PATH, so commit with the venv
-activated.
 
 ## CI/CD
 
@@ -423,7 +414,7 @@ and from the button (`workflow_dispatch`). Six jobs:
 
 | Job | What it does |
 | --- | --- |
-| **Linters** | `ruff check`, `black --check`, a full `pre-commit` run |
+| **Linters** | `ruff check` and `black --check` over the whole repository |
 | **Django checks** | `manage.py check`, `makemigrations --check` (forgotten migrations), `check --deploy --fail-level WARNING` with the HTTPS flags on |
 | **Tests** | a matrix of Python 3.12 and 3.13, a real PostgreSQL 16 service container, `pytest --cov --cov-fail-under=90`, coverage report in the artifacts |
 | **docker compose up** | starts the stack the way production does and checks the 302 for anonymous visitors on `/manage/` and `/files/`, an admin sign-in, and that the roles are seeded |
