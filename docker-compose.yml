@@ -15,8 +15,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    # Loopback only: the short form binds to 0.0.0.0, which would put a database
+    # with credentials from this file on every interface of the machine.
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
 
   web:
     build: .
