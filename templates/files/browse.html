@@ -45,49 +45,51 @@
     Storage: <code>{{ backend }}</code>. Maximum file size: {{ max_file_size }}.
   </p>
 
-  <table data-testid="entries">
-    <thead>
-      <tr>
-        <th scope="col">Name</th>
-        <th scope="col">Type</th>
-        <th scope="col">Size</th>
-        <th scope="col">Modified</th>
-        <th scope="col">Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% if not at_root %}
+  <div class="table-wrap">
+    <table data-testid="entries">
+      <thead>
         <tr>
-          <td colspan="5">
-            <a href="{% url 'files:browse' %}?path={{ parent|urlencode }}" data-testid="up">← Up</a>
-          </td>
+          <th scope="col">Name</th>
+          <th scope="col">Type</th>
+          <th scope="col">Size</th>
+          <th scope="col">Modified</th>
+          <th scope="col">Actions</th>
         </tr>
-      {% endif %}
+      </thead>
+      <tbody>
+        {% if not at_root %}
+          <tr>
+            <td colspan="5">
+              <a href="{% url 'files:browse' %}?path={{ parent|urlencode }}" data-testid="up">← Up</a>
+            </td>
+          </tr>
+        {% endif %}
 
-      {% for entry in entries %}
-        <tr data-testid="entry" data-name="{{ entry.name }}">
-          <td>
-            {% if entry.is_dir %}
-              <span aria-hidden="true">📁</span>
-              <a href="{% url 'files:browse' %}?path={{ entry.path|urlencode }}">{{ entry.name }}</a>
-            {% else %}
-              <span aria-hidden="true">📄</span>
-              <a href="{% url 'files:download' %}?path={{ entry.path|urlencode }}">{{ entry.name }}</a>
-            {% endif %}
-          </td>
-          <td>{% if entry.is_dir %}folder{% else %}file{% endif %}</td>
-          <td>{% if entry.is_dir %}—{% else %}{{ entry.size|filesizeformat }}{% endif %}</td>
-          <td>{% if entry.modified %}{{ entry.modified|date:"d.m.Y H:i" }}{% else %}—{% endif %}</td>
-          <td class="actions">
-            <a href="{% url 'files:rename' %}?path={{ entry.path|urlencode }}"
-               aria-label="Rename {{ entry.name }}">Rename</a>
-            <a href="{% url 'files:delete' %}?path={{ entry.path|urlencode }}"
-               aria-label="Delete {{ entry.name }}">Delete</a>
-          </td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="5"><em>Folder is empty.</em></td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        {% for entry in entries %}
+          <tr data-testid="entry" data-name="{{ entry.name }}">
+            <td>
+              {% if entry.is_dir %}
+                <span aria-hidden="true">📁</span>
+                <a href="{% url 'files:browse' %}?path={{ entry.path|urlencode }}">{{ entry.name }}</a>
+              {% else %}
+                <span aria-hidden="true">📄</span>
+                <a href="{% url 'files:download' %}?path={{ entry.path|urlencode }}">{{ entry.name }}</a>
+              {% endif %}
+            </td>
+            <td>{% if entry.is_dir %}folder{% else %}file{% endif %}</td>
+            <td>{% if entry.is_dir %}—{% else %}{{ entry.size|filesizeformat }}{% endif %}</td>
+            <td>{% if entry.modified %}{{ entry.modified|date:"d.m.Y H:i" }}{% else %}—{% endif %}</td>
+            <td class="actions">
+              <a href="{% url 'files:rename' %}?path={{ entry.path|urlencode }}"
+                 aria-label="Rename {{ entry.name }}">Rename</a>
+              <a href="{% url 'files:delete' %}?path={{ entry.path|urlencode }}"
+                 aria-label="Delete {{ entry.name }}">Delete</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5"><em>Folder is empty.</em></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 {% endblock %}

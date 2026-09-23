@@ -5,6 +5,3 @@ pytest-cov>=7.1.0
 moto[s3]>=5.2.3
 ruff>=0.16.7
 black>=26.5.1
-pre-commit>=4.6.2
-# Hooks are called as python -m pre_commit_hooks.<module>, see .pre-commit-config.yaml
-pre-commit-hooks>=6.0

@@ -7,6 +7,7 @@ services:
       POSTGRES_DB: users_roles
       POSTGRES_USER: users_roles
       POSTGRES_PASSWORD: users_roles
+      LC_MESSAGES: en_US.UTF-8
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -14,6 +15,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    # Loopback only: the short form binds to 0.0.0.0, which would put a database
+    # with credentials from this file on every interface of the machine.
+    ports:
+      - "127.0.0.1:5434:5432"
 
   web:
     build: .
@@ -22,7 +27,6 @@ services:
     # Overrides .env
     environment:
       DEBUG: "False"
-      ALLOWED_HOSTS: localhost,127.0.0.1
       DATABASE_URL: postgres://users_roles:users_roles@db:5432/users_roles
       # Demo demo_* accounts on start. Drop this or set "0" in production.
       SEED_DEMO_USERS: "1"

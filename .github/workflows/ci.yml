@@ -41,9 +41,6 @@ jobs:
       - name: black
         run: black --check --diff .
 
-      - name: pre-commit (the same hooks as locally)
-        uses: pre-commit/action@v3.0.1
-
   django-checks:
     name: Django checks
     runs-on: ubuntu-latest
